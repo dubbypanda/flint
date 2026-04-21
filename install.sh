@@ -8,7 +8,7 @@ set -e
 
 FLINT_DIR="$HOME/.flint"
 FLINT_BIN="/usr/local/bin/flint"
-REPO_URL="https://github.com/flint-editor/flint.git"
+REPO_URL="https://github.com/Chintanpatel24/flint.git"
 
 echo ""
 echo "  ███████╗██╗      █████╗ ███████╗"
