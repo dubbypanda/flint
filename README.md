@@ -28,7 +28,7 @@ Flint is a privacy-focused note-taking application inspired by Obsidian. All you
 
 ```bash
 # Clone the repository
-git clone https://github.com/flint-vault/flint.git
+git clone https://github.com/Chintanpatel24/flint.git
 cd flint
 
 # Run the installer
