@@ -1,4 +1,4 @@
-# 🔥 Flint — Your Local Vault
+# Flint — Your Local Vault
 
 > A local-first, secure knowledge base. Your thoughts, your data, your control.
 
@@ -10,17 +10,17 @@ Flint is a privacy-focused note-taking application inspired by Obsidian. All you
 
 ## ✨ Features
 
-- **📝 Markdown Editor** — Full GFM support with live preview and split view
-- **🔗 Wiki Links** — Connect notes with `[[double brackets]]` syntax
-- **🌐 Graph View** — Interactive force-directed knowledge graph (black theme)
-- **🔒 Local & Secure** — All data stored on your device via encrypted localStorage
-- **🏪 Multi-Vault** — Separate workspaces for different projects
-- **📁 Folders** — Organize notes hierarchically
-- **🔍 Search** — Instant full-text search across all notes
-- **📌 Pinning** — Pin important notes for quick access
-- **💾 Auto-save** — Never lose your work
-- **⌨️ Keyboard Shortcuts** — Efficient workflow with hotkeys
-- **🌙 Dark Theme** — Pure black, minimal, easy on the eyes
+- ** Markdown Editor** — Full GFM support with live preview and split view
+- ** Wiki Links** — Connect notes with `[[double brackets]]` syntax
+- ** Graph View** — Interactive force-directed knowledge graph (black theme)
+- ** Local & Secure** — All data stored on your device via encrypted localStorage
+- ** Multi-Vault** — Separate workspaces for different projects
+- ** Folders** — Organize notes hierarchically
+- ** Search** — Instant full-text search across all notes
+- ** Pinning** — Pin important notes for quick access
+- ** Auto-save** — Never lose your work
+- ** Keyboard Shortcuts** — Efficient workflow with hotkeys
+- ** Dark Theme** — Pure black, minimal, easy on the eyes
 
 ## 🚀 Installation
 
