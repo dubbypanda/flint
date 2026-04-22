@@ -1,8 +1,12 @@
-# ⬡ Flint
+<div align=center>
+<img src="public/flint-logo.png" alt="Flint Logo" width="100" height="100">   
+</div>
+
+# Flint
 
 **Secure, local-first knowledge base — a web-based Obsidian clone with AI.**
 
-![Flint](public/flint-logo.png)
+
 
 ---
 
