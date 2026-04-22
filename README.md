@@ -1,12 +1,6 @@
-<div align="center">
-  <img src="public/flint-logo.png" style="width: 10%; height: auto;">
-</div>   
+# Flint          <img src="public/flint-logo.png" style="width: 3%; height: auto;"> 
 
----
-
-# ⬡ Flint
-
-A **secure, local-first knowledge base** with AI-powered intelligence. Your notes, your graph, your AI — all running locally on your machine.
+- A **secure, local-first knowledge base** with AI-powered intelligence. Your notes, your graph, your AI — all running locally on your machine.
 
 ---
 
