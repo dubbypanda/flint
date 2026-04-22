@@ -1,4 +1,4 @@
-# Flint — Your Local Vault
+# Flint - Your Local Vault
 
 > A local-first, secure knowledge base. Your thoughts, your data, your control.
 
