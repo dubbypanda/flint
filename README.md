@@ -1,4 +1,16 @@
-# Flint          <img src="public/flint-logo.png" style="width: 3%; height: auto;"> 
+<div align=center>
+       
+<img src="public/flint-logo.png" style="width: 9%; height: auto;"> 
+
+![Flint](https://img.shields.io/badge/version-1.0.0-amber?style=flat-square)
+![License](https://img.shields.io/badge/license-MIT-green?style=flat-square)
+![Platform](https://img.shields.io/badge/platform-macOS%20%7C%20Linux%20%7C%20Windows-blue?style=flat-square)
+
+</div>
+
+---
+
+# Flint 
 
 - A **secure, local-first knowledge base** with AI-powered intelligence. Your notes, your graph, your AI — all running locally on your machine.
 
