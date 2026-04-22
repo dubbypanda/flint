@@ -4,9 +4,9 @@ A **secure, local-first knowledge base** with AI-powered intelligence. Your note
 
 ---
 
-## ✨ Features
+## Features
 
-### 📝 Note-Taking
+### Note-Taking
 - Full **Markdown** support with live preview
 - **Wiki Links** (`[[Note Name]]`) to connect notes
 - **Tags** (`#tag`) for categorization
@@ -14,14 +14,14 @@ A **secure, local-first knowledge base** with AI-powered intelligence. Your note
 - Split view (Editor + Preview)
 - Formatting toolbar (Bold, Italic, Heading, Quote, Code, Links, Lists)
 
-### 📊 Graph View
+### Graph View
 - Interactive **force-directed graph** visualization
 - Node size scales with connection count
 - Physics simulation — drag nodes, connected notes follow
 - Zoom, pan, search, depth filter
 - Curved edges between connected notes
 
-### 🧠 AI Agent (Python + Ollama)
+### AI Agent (Python + Ollama)
 - **Real Python backend** that connects to Ollama locally
 - **Notes = Memory** — AI reads all your notes and graph connections
 - **Internet access** — AI searches Wikipedia for real-time info
@@ -29,7 +29,7 @@ A **secure, local-first knowledge base** with AI-powered intelligence. Your note
 - **Streaming responses** in real-time
 - **Browser fallback** when agent is not running
 
-### 🔒 Local & Secure
+### Local & Secure
 - **No cloud, no tracking** — all data stays on your device
 - **localStorage** for persistence
 - **No external API calls** (except Wikipedia when internet access is enabled)
@@ -37,7 +37,7 @@ A **secure, local-first knowledge base** with AI-powered intelligence. Your note
 
 ---
 
-## 🚀 Installation
+##  Installation
 
 ### Prerequisites
 - **Node.js** 18+ — [Install](https://nodejs.org)
@@ -60,7 +60,7 @@ After install, Flint appears in your **app menu**. Or run `flint` from terminal.
 
 ---
 
-## 🎮 Usage
+## Usage
 
 ### Commands
 | Command | Description |
@@ -100,12 +100,12 @@ ollama pull codellama   # Code-focused
 
 ---
 
-## 🏗️ Architecture
+## Architecture
 
 ```
 User asks question
        ↓
-┌──────────────────────────────┐
+┌───────────────────────────────┐
 │  Python Agent (port 5100)     │
 │  ├─ Receives query + notes    │
 │  ├─ Builds knowledge graph    │
@@ -114,14 +114,14 @@ User asks question
 │  ├─ Searches Wikipedia (opt)  │
 │  ├─ Sends to Ollama           │
 │  └─ Streams response back     │
-└──────────────────────────────┘
+└───────────────────────────────┘
        ↓
    Browser renders in chat UI
 ```
 
 ---
 
-## 📁 Project Structure
+## Project Structure
 
 ```
 flint/
@@ -152,7 +152,7 @@ flint/
 
 ---
 
-## 📦 Installed Location
+## Installed Location
 
 After `bash install.sh`:
 ```
@@ -172,7 +172,7 @@ After `bash install.sh`:
 
 ---
 
-## 🛠️ Tech Stack
+## Tech Stack
 
 | Layer | Technology |
 |-------|-----------|
@@ -184,9 +184,3 @@ After `bash install.sh`:
 | AI Engine | Ollama (any model) |
 | Web Search | Wikipedia API |
 | Storage | localStorage (browser) |
-
----
-
-## 📄 License
-
-MIT
