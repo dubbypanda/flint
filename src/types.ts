@@ -46,13 +46,26 @@ export interface ChatMessage {
   webResults?: string;
 }
 
-export type AIProvider = 'ollama' | 'openai' | 'gemini' | 'openai-compatible';
+export interface AIAction {
+  type: 'update_note' | 'rename_note' | 'create_note' | 'delete_note';
+  target?: 'active' | 'id' | 'title';
+  noteId?: string;
+  matchTitle?: string;
+  title?: string;
+  content?: string;
+}
+
+export type AIProvider = 'ollama' | 'openai' | 'gemini' | 'openai-compatible' | 'local-gguf';
 
 export interface AISettings {
   provider: AIProvider;
   ollamaUrl: string;
   apiKey: string;
   apiBaseUrl: string;
+  localModelPath: string;
+  localModelContext: number;
+  localModelThreads: number;
+  maxOutputTokens: number;
   model: string;
   maxContextNotes: number;
   temperature: number;

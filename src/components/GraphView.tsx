@@ -3,7 +3,7 @@ import { useStore } from '../store';
 import { FlintLogo } from './FlintLogo';
 import { X, ZoomIn, ZoomOut, RotateCcw, Play, Pause, Search } from 'lucide-react';
 
-interface GNode { id: string; title: string; x: number; y: number; vx: number; vy: number; conns: number; }
+interface GNode { id: string; title: string; x: number; y: number; vx: number; vy: number; conns: number; group: string; }
 interface GEdge { from: string; to: string; }
 
 export function GraphView() {
@@ -18,10 +18,18 @@ export function GraphView() {
   const animRef = useRef(0);
   const physicsRef = useRef(true);
   const hoverRef = useRef<string | null>(null);
+  const selectedRef = useRef<string | null>(null);
+  const groupTargetRef = useRef<Record<string, { x: number; y: number }>>({});
   const sizeRef = useRef({ w: 0, h: 0 });
   const [graphStats, setGraphStats] = useState({ nodes: 0, edges: 0 });
   const [filterQuery, setFilterQuery] = useState('');
   const [depthFilter, setDepthFilter] = useState(0);
+  const [showAllLabels, setShowAllLabels] = useState(false);
+  const [nodeScale, setNodeScale] = useState(1);
+  const [linkDistance, setLinkDistance] = useState(160);
+  const [centerForce, setCenterForce] = useState(0.0004);
+  const [groupPull, setGroupPull] = useState(0.004);
+  const [groupSpread, setGroupSpread] = useState(280);
 
   const buildGraph = useCallback(() => {
     const links: Record<string, Set<string>> = {};
@@ -39,10 +47,36 @@ export function GraphView() {
 
     const cx = sizeRef.current.w / 2 || 400;
     const cy = sizeRef.current.h / 2 || 300;
+
+    const deriveGroup = (note: typeof state.notes[number]) => {
+      if (note.folderId) {
+        const folder = state.folders.find(f => f.id === note.folderId);
+        return `folder:${folder?.name || note.folderId}`;
+      }
+      if (note.filePath && note.filePath.includes('/')) {
+        const parts = note.filePath.split('/');
+        if (parts.length > 1) return `path:${parts.slice(0, -1).join('/')}`;
+      }
+      return 'root';
+    };
+
+    const groups = Array.from(new Set(state.notes.map(deriveGroup)));
+    const targetMap: Record<string, { x: number; y: number }> = {};
+    groups.forEach((g, i) => {
+      const angle = (i / Math.max(groups.length, 1)) * Math.PI * 2;
+      const radius = Math.max(groupSpread, 120);
+      targetMap[g] = {
+        x: cx + Math.cos(angle) * radius,
+        y: cy + Math.sin(angle) * radius,
+      };
+    });
+    groupTargetRef.current = targetMap;
+
     nodesRef.current = state.notes.map((n) => ({
+      group: deriveGroup(n),
       id: n.id, title: n.title,
-      x: cx + (Math.random() - 0.5) * 500,
-      y: cy + (Math.random() - 0.5) * 400,
+      x: (targetMap[deriveGroup(n)]?.x || cx) + (Math.random() - 0.5) * 140,
+      y: (targetMap[deriveGroup(n)]?.y || cy) + (Math.random() - 0.5) * 120,
       vx: 0, vy: 0,
       conns: links[n.id]?.size || 0,
     }));
@@ -62,7 +96,7 @@ export function GraphView() {
 
     // Update state for display
     setGraphStats({ nodes: nodesRef.current.length, edges: edgesRef.current.length });
-  }, [state.notes]);
+  }, [state.notes, state.folders, groupSpread]);
 
   useEffect(() => {
     const canvas = canvasRef.current;
@@ -128,7 +162,8 @@ export function GraphView() {
           const dx = nodes[j].x - nodes[i].x;
           const dy = nodes[j].y - nodes[i].y;
           const d = Math.max(Math.sqrt(dx * dx + dy * dy), 1);
-          const f = 4000 / (d * d);
+          const sameGroup = nodes[i].group === nodes[j].group;
+          const f = (sameGroup ? 2800 : 4600) / (d * d);
           const fx = (dx / d) * f;
           const fy = (dy / d) * f;
           nodes[i].vx -= fx; nodes[i].vy -= fy;
@@ -142,7 +177,7 @@ export function GraphView() {
         if (!a || !b) continue;
         const dx = b.x - a.x; const dy = b.y - a.y;
         const d = Math.max(Math.sqrt(dx * dx + dy * dy), 1);
-        const f = (d - 160) * 0.005;
+        const f = (d - linkDistance) * 0.005;
         const fx = (dx / d) * f;
         const fy = (dy / d) * f;
         a.vx += fx; a.vy += fy;
@@ -151,8 +186,14 @@ export function GraphView() {
 
       // Center gravity
       for (const n of nodes) {
-        n.vx += (cx - n.x) * 0.0004;
-        n.vy += (cy - n.y) * 0.0004;
+        n.vx += (cx - n.x) * centerForce;
+        n.vy += (cy - n.y) * centerForce;
+
+        const gt = groupTargetRef.current[n.group];
+        if (gt) {
+          n.vx += (gt.x - n.x) * groupPull;
+          n.vy += (gt.y - n.y) * groupPull;
+        }
       }
 
       // Apply velocity with heavy damping
@@ -181,11 +222,14 @@ export function GraphView() {
       ctx!.clearRect(0, 0, w, h);
 
       // Background
-      ctx!.fillStyle = '#050505';
+      const bg = ctx!.createLinearGradient(0, 0, 0, h);
+      bg.addColorStop(0, '#090909');
+      bg.addColorStop(1, '#050505');
+      ctx!.fillStyle = bg;
       ctx!.fillRect(0, 0, w, h);
 
       // Grid dots
-      ctx!.fillStyle = '#0c0c0c';
+      ctx!.fillStyle = 'rgba(255,255,255,0.025)';
       const gs = 40 * z;
       if (gs > 10) {
         const ox = ((p.x % gs) + gs) % gs;
@@ -222,21 +266,11 @@ export function GraphView() {
         const isHover = hoverRef.current === e.from || hoverRef.current === e.to;
         const isActive = state.activeNoteId === e.from || state.activeNoteId === e.to;
 
-        // Curved edges
-        const mx = (a.x + b.x) / 2;
-        const my = (a.y + b.y) / 2;
-        const dx = b.x - a.x;
-        const dy = b.y - a.y;
-        const len = Math.sqrt(dx * dx + dy * dy);
-        const offset = len * 0.08;
-        const cx2 = mx + (dy / len) * offset;
-        const cy2 = my - (dx / len) * offset;
-
         ctx!.beginPath();
-        ctx!.strokeStyle = isActive ? '#444' : isHover ? '#333' : '#1a1a1a';
-        ctx!.lineWidth = isActive ? 1.5 : isHover ? 1.2 : 0.6;
+        ctx!.strokeStyle = isHover ? 'rgba(70,140,255,0.85)' : isActive ? 'rgba(180,180,180,0.36)' : 'rgba(120,120,120,0.12)';
+        ctx!.lineWidth = isActive ? 1.1 : isHover ? 0.9 : 0.45;
         ctx!.moveTo(a.x, a.y);
-        ctx!.quadraticCurveTo(cx2, cy2, b.x, b.y);
+        ctx!.lineTo(b.x, b.y);
         ctx!.stroke();
       }
 
@@ -246,20 +280,21 @@ export function GraphView() {
         if (visibleIds && !visibleIds.has(n.id)) continue;
         if (queryLower && !matchesFilter(n) && n.conns === 0) continue;
 
-        const r = 3 + Math.min(n.conns, 15) * 1.8;
+        const r = (2.5 + Math.min(n.conns, 12) * 0.8) * nodeScale;
         const isActive = n.id === activeId;
         const isHover = n.id === hoverRef.current;
+        const isSelected = n.id === selectedRef.current;
         const dimmed = queryLower && !matchesFilter(n);
 
         // Outer glow for active
         if (isActive) {
           ctx!.beginPath();
-          ctx!.arc(n.x, n.y, r + 10, 0, Math.PI * 2);
-          ctx!.fillStyle = 'rgba(180,180,180,0.06)';
+          ctx!.arc(n.x, n.y, r + 8, 0, Math.PI * 2);
+          ctx!.fillStyle = 'rgba(80,140,255,0.06)';
           ctx!.fill();
           ctx!.beginPath();
-          ctx!.arc(n.x, n.y, r + 5, 0, Math.PI * 2);
-          ctx!.fillStyle = 'rgba(150,150,150,0.1)';
+          ctx!.arc(n.x, n.y, r + 4, 0, Math.PI * 2);
+          ctx!.fillStyle = 'rgba(120,170,255,0.1)';
           ctx!.fill();
         }
 
@@ -268,37 +303,37 @@ export function GraphView() {
         ctx!.arc(n.x, n.y, r, 0, Math.PI * 2);
 
         if (dimmed) {
-          ctx!.fillStyle = '#1a1a1a';
+          ctx!.fillStyle = 'rgba(70,70,70,0.35)';
           ctx!.fill();
         } else if (isActive) {
-          ctx!.fillStyle = '#ccc';
-          ctx!.strokeStyle = '#888';
-          ctx!.lineWidth = 2;
+          ctx!.fillStyle = '#d9d9d9';
+          ctx!.strokeStyle = '#a0a0a0';
+          ctx!.lineWidth = 1;
           ctx!.fill(); ctx!.stroke();
         } else if (n.conns > 0) {
-          const b = 55 + Math.min(n.conns, 12) * 14;
+          const b = 88 + Math.min(n.conns, 12) * 8;
           ctx!.fillStyle = `rgb(${b},${b},${b})`;
           ctx!.fill();
         } else {
-          ctx!.fillStyle = '#222';
+          ctx!.fillStyle = '#1c1c1c';
           ctx!.fill();
         }
 
         // Hover ring
-        if (isHover && !isActive) {
+        if ((isHover || isSelected) && !isActive) {
           ctx!.beginPath();
           ctx!.arc(n.x, n.y, r + 5, 0, Math.PI * 2);
-          ctx!.strokeStyle = '#555';
-          ctx!.lineWidth = 1;
+          ctx!.strokeStyle = isHover ? 'rgba(70,140,255,0.8)' : 'rgba(220,220,220,0.45)';
+          ctx!.lineWidth = 0.8;
           ctx!.stroke();
         }
 
         // Labels
-        if (!dimmed && (n.conns > 0 || isHover || isActive)) {
-          ctx!.fillStyle = isActive ? '#eee' : isHover ? '#ccc' : n.conns > 3 ? '#666' : '#3a3a3a';
-          ctx!.font = `${isActive ? 'bold 11' : '10'}px -apple-system, system-ui, sans-serif`;
+        if (!dimmed && (showAllLabels || isHover || isActive || isSelected)) {
+          ctx!.fillStyle = isActive ? '#f0f0f0' : '#c0c0c0';
+          ctx!.font = `${isActive || isSelected ? 'bold 10' : '9'}px -apple-system, system-ui, sans-serif`;
           ctx!.textAlign = 'center';
-          ctx!.fillText(n.title, n.x, n.y + r + 14);
+          ctx!.fillText(n.title, n.x, n.y + r + 13);
         }
       }
 
@@ -308,13 +343,13 @@ export function GraphView() {
 
     animRef.current = requestAnimationFrame(draw);
     return () => { running = false; cancelAnimationFrame(animRef.current); };
-  }, [state.activeNoteId, state.notes, buildGraph, filterQuery, depthFilter]);
+  }, [state.activeNoteId, state.notes, buildGraph, filterQuery, depthFilter, nodeScale, linkDistance, centerForce, groupPull, showAllLabels]);
 
   const getNodeAt = useCallback((mx: number, my: number) => {
     const z = zoomRef.current; const p = panRef.current;
     const wx = (mx - p.x) / z; const wy = (my - p.y) / z;
     for (const n of [...nodesRef.current].reverse()) {
-      const r = 3 + Math.min(n.conns, 15) * 1.8 + 10;
+      const r = ((2.5 + Math.min(n.conns, 12) * 0.8) * nodeScale) + 10;
       if ((wx - n.x) ** 2 + (wy - n.y) ** 2 < r * r) return n;
     }
     return null;
@@ -371,7 +406,10 @@ export function GraphView() {
     if (wasDragRef.current) { wasDragRef.current = false; return; }
     const rect = canvasRef.current!.getBoundingClientRect();
     const n = getNodeAt(e.clientX - rect.left, e.clientY - rect.top);
-    if (n) dispatch({ type: 'OPEN_TAB', payload: n.id });
+    if (n) {
+      selectedRef.current = n.id;
+      dispatch({ type: 'OPEN_TAB', payload: n.id });
+    }
   };
 
   const handleWheel = (e: React.WheelEvent) => {
@@ -427,7 +465,7 @@ export function GraphView() {
       </div>
 
       {/* Search filter + depth */}
-      <div style={{ position: 'absolute', top: 48, left: 16, display: 'flex', gap: 6, alignItems: 'center' }}>
+      <div style={{ position: 'absolute', top: 48, left: 16, display: 'flex', gap: 6, alignItems: 'center', flexWrap: 'wrap', maxWidth: '70vw' }}>
         <div style={{ display: 'flex', alignItems: 'center', gap: 6, background: '#0a0a0a', border: '1px solid #1a1a1a', borderRadius: 6, padding: '4px 8px' }}>
           <Search size={12} style={{ color: '#444' }} />
           <input type="text" placeholder="Filter nodes..." value={filterQuery}
@@ -440,6 +478,34 @@ export function GraphView() {
             onChange={e => setDepthFilter(parseInt(e.target.value))}
             style={{ width: 60, accentColor: '#555' }} />
           <span style={{ fontSize: 9, color: '#555', width: 12 }}>{depthFilter === 0 ? '∞' : depthFilter}</span>
+        </div>
+        <label style={{ display: 'flex', alignItems: 'center', gap: 5, background: '#0a0a0a', border: '1px solid #1a1a1a', borderRadius: 6, padding: '4px 8px', fontSize: 10, color: '#666' }}>
+          <input type="checkbox" checked={showAllLabels} onChange={e => setShowAllLabels(e.target.checked)} />
+          Show all titles
+        </label>
+        <div style={{ display: 'flex', alignItems: 'center', gap: 4, background: '#0a0a0a', border: '1px solid #1a1a1a', borderRadius: 6, padding: '4px 8px' }}>
+          <span style={{ fontSize: 9, color: '#444' }}>Node</span>
+          <input type="range" min={0.7} max={2} step={0.1} value={nodeScale}
+            onChange={e => setNodeScale(parseFloat(e.target.value))}
+            style={{ width: 74, accentColor: '#555' }} />
+        </div>
+        <div style={{ display: 'flex', alignItems: 'center', gap: 4, background: '#0a0a0a', border: '1px solid #1a1a1a', borderRadius: 6, padding: '4px 8px' }}>
+          <span style={{ fontSize: 9, color: '#444' }}>Distance</span>
+          <input type="range" min={90} max={320} step={5} value={linkDistance}
+            onChange={e => setLinkDistance(parseInt(e.target.value))}
+            style={{ width: 74, accentColor: '#555' }} />
+        </div>
+        <div style={{ display: 'flex', alignItems: 'center', gap: 4, background: '#0a0a0a', border: '1px solid #1a1a1a', borderRadius: 6, padding: '4px 8px' }}>
+          <span style={{ fontSize: 9, color: '#444' }}>Center</span>
+          <input type="range" min={0.0001} max={0.0015} step={0.0001} value={centerForce}
+            onChange={e => setCenterForce(parseFloat(e.target.value))}
+            style={{ width: 74, accentColor: '#555' }} />
+        </div>
+        <div style={{ display: 'flex', alignItems: 'center', gap: 4, background: '#0a0a0a', border: '1px solid #1a1a1a', borderRadius: 6, padding: '4px 8px' }}>
+          <span style={{ fontSize: 9, color: '#444' }}>Groups</span>
+          <input type="range" min={140} max={520} step={10} value={groupSpread}
+            onChange={e => setGroupSpread(parseInt(e.target.value))}
+            style={{ width: 74, accentColor: '#555' }} />
         </div>
       </div>
 

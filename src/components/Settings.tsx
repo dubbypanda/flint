@@ -12,11 +12,12 @@ interface Settings {
   showLineNumbers: boolean;
   tabSize: number;
   wordWrap: boolean;
+  theme: 'graphite' | 'ocean' | 'forest' | 'sunset';
 }
 
 const SETTINGS_KEY = 'flint-settings';
 const DEFAULT_SETTINGS: Settings = {
-  fontSize: 14, spellCheck: false, autoSave: true, showLineNumbers: false, tabSize: 2, wordWrap: true,
+  fontSize: 14, spellCheck: false, autoSave: true, showLineNumbers: false, tabSize: 2, wordWrap: true, theme: 'graphite',
 };
 
 function loadSettings(): Settings {
@@ -40,7 +41,9 @@ export function SettingsPanel() {
   const [agentUp, setAgentUp] = useState(false);
   const [refreshing, setRefreshing] = useState(false);
   const [customModel, setCustomModel] = useState('');
-  const isApiProvider = state.aiSettings.provider !== 'ollama';
+  const isCredentialProvider = state.aiSettings.provider === 'openai' || state.aiSettings.provider === 'gemini' || state.aiSettings.provider === 'openai-compatible';
+  const isLocalProvider = state.aiSettings.provider === 'local-gguf';
+  const isApiProvider = isCredentialProvider;
   const isOpenAICompatible = state.aiSettings.provider === 'openai-compatible';
 
   useEffect(() => { saveSettings(settings); }, [settings]);
@@ -51,6 +54,10 @@ export function SettingsPanel() {
       style.textContent = `.flint-editor { font-size: ${settings.fontSize}px; tab-size: ${settings.tabSize}; ${settings.wordWrap ? '' : 'white-space: pre; overflow-x: auto;'} }`;
     }
   }, [settings.fontSize, settings.tabSize, settings.wordWrap]);
+
+  useEffect(() => {
+    document.body.dataset.theme = settings.theme;
+  }, [settings.theme]);
 
   // Check Ollama connection and auto-select model
   useEffect(() => {
@@ -313,6 +320,16 @@ export function SettingsPanel() {
                   onChange={e => setSettings(s => ({ ...s, fontSize: parseInt(e.target.value) }))}
                   style={{ flex: 1, accentColor: '#666' }} />
               </SettingRow>
+              <SettingRow icon={<Type size={14} />} label="Theme color">
+                <select value={settings.theme}
+                  onChange={e => setSettings(s => ({ ...s, theme: e.target.value as Settings['theme'] }))}
+                  style={{ flex: 1, background: '#0d0d0d', border: '1px solid #1a1a1a', borderRadius: 4, padding: '5px 8px', color: '#aaa', fontSize: 12, outline: 'none' }}>
+                  <option value="graphite">Graphite</option>
+                  <option value="ocean">Ocean</option>
+                  <option value="forest">Forest</option>
+                  <option value="sunset">Sunset</option>
+                </select>
+              </SettingRow>
               <SettingRow icon={<Hash size={14} />} label="Tab size" value={`${settings.tabSize}`}>
                 <input type="range" min={2} max={8} step={2} value={settings.tabSize}
                   onChange={e => setSettings(s => ({ ...s, tabSize: parseInt(e.target.value) }))}
@@ -359,6 +376,10 @@ export function SettingsPanel() {
                     ? `Agent running. Found ${models.length} model${models.length !== 1 ? 's' : ''}: ${models.slice(0, 3).join(', ')}${models.length > 3 ? '...' : ''}`
                     : state.aiSettings.provider === 'ollama' && ollamaStatus === 'disconnected'
                     ? 'Agent running but Ollama not found. Start with: ollama serve'
+                    : isLocalProvider
+                    ? state.aiSettings.localModelPath
+                      ? 'Agent running. Local GGUF model path configured.'
+                      : 'Agent running. Set a local GGUF model path to use your downloaded model.'
                     : state.aiSettings.provider === 'ollama'
                     ? 'Checking connection...'
                     : 'Agent running. Requests will use your selected API provider and key.'}
@@ -367,9 +388,10 @@ export function SettingsPanel() {
 
               <SettingRow icon={<Brain size={14} />} label="Provider">
                 <select value={state.aiSettings.provider}
-                  onChange={e => dispatch({ type: 'UPDATE_AI_SETTINGS', payload: { provider: e.target.value as 'ollama' | 'openai' | 'gemini' | 'openai-compatible' } })}
+                  onChange={e => dispatch({ type: 'UPDATE_AI_SETTINGS', payload: { provider: e.target.value as 'ollama' | 'openai' | 'gemini' | 'openai-compatible' | 'local-gguf' } })}
                   style={{ flex: 1, background: '#0d0d0d', border: '1px solid #1a1a1a', borderRadius: 4, padding: '5px 8px', color: '#aaa', fontSize: 12, outline: 'none' }}>
                   <option value="ollama">Ollama (local)</option>
+                  <option value="local-gguf">Local GGUF file (Hugging Face/local)</option>
                   <option value="openai">OpenAI</option>
                   <option value="gemini">Google Gemini</option>
                   <option value="openai-compatible">Other OpenAI-compatible API</option>
@@ -399,6 +421,27 @@ export function SettingsPanel() {
                     placeholder="https://api.provider.com/v1"
                     style={{ flex: 1, background: '#0d0d0d', border: '1px solid #1a1a1a', borderRadius: 4, padding: '5px 8px', color: '#aaa', fontSize: 12, outline: 'none' }} />
                 </SettingRow>
+              )}
+
+              {isLocalProvider && (
+                <>
+                  <SettingRow icon={<FolderOpen size={14} />} label="GGUF model path">
+                    <input type="text" value={state.aiSettings.localModelPath}
+                      onChange={e => dispatch({ type: 'UPDATE_AI_SETTINGS', payload: { localModelPath: e.target.value } })}
+                      placeholder="/path/to/model.gguf"
+                      style={{ flex: 1, background: '#0d0d0d', border: '1px solid #1a1a1a', borderRadius: 4, padding: '5px 8px', color: '#aaa', fontSize: 12, outline: 'none' }} />
+                  </SettingRow>
+                  <SettingRow icon={<Hash size={14} />} label="Local context" value={`${state.aiSettings.localModelContext}`}>
+                    <input type="range" min={512} max={8192} step={256} value={state.aiSettings.localModelContext}
+                      onChange={e => dispatch({ type: 'UPDATE_AI_SETTINGS', payload: { localModelContext: parseInt(e.target.value) } })}
+                      style={{ flex: 1, accentColor: '#666' }} />
+                  </SettingRow>
+                  <SettingRow icon={<Hash size={14} />} label="Local threads" value={`${state.aiSettings.localModelThreads}`}>
+                    <input type="range" min={1} max={16} step={1} value={state.aiSettings.localModelThreads}
+                      onChange={e => dispatch({ type: 'UPDATE_AI_SETTINGS', payload: { localModelThreads: parseInt(e.target.value) } })}
+                      style={{ flex: 1, accentColor: '#666' }} />
+                  </SettingRow>
+                </>
               )}
 
               {/* Model — works with ANY model */}
@@ -471,6 +514,12 @@ export function SettingsPanel() {
                   style={{ flex: 1, accentColor: '#666' }} />
               </SettingRow>
 
+              <SettingRow icon={<Hash size={14} />} label="Max output tokens" value={`${state.aiSettings.maxOutputTokens}`}>
+                <input type="range" min={64} max={1024} step={32} value={state.aiSettings.maxOutputTokens}
+                  onChange={e => dispatch({ type: 'UPDATE_AI_SETTINGS', payload: { maxOutputTokens: parseInt(e.target.value) } })}
+                  style={{ flex: 1, accentColor: '#666' }} />
+              </SettingRow>
+
               {/* System prompt */}
               <div>
                 <div style={{ fontSize: 11, color: '#555', marginBottom: 6 }}>System prompt</div>
@@ -485,7 +534,8 @@ export function SettingsPanel() {
                 <div style={{ fontSize: 11, fontWeight: 600, color: '#555', marginBottom: 6 }}>How Flint AI works</div>
                 <div style={{ fontSize: 10, color: '#3a3a3a', lineHeight: 1.6 }}>
                   • Builds responses from your <strong style={{ color: '#555' }}>note memory + graph links</strong><br />
-                  • Works with <strong style={{ color: '#555' }}>Ollama, OpenAI, Gemini, and OpenAI-compatible APIs</strong><br />
+                  • Works with <strong style={{ color: '#555' }}>Ollama, local GGUF files, OpenAI, Gemini, and OpenAI-compatible APIs</strong><br />
+                  • Use tiny local models (MB-scale GGUF) by setting a small model path + lower output tokens<br />
                   • Paste your API key in settings when using cloud providers<br />
                   • Requests are routed through the local <strong style={{ color: '#555' }}>Python agent</strong><br />
                   • Uses your <strong style={{ color: '#555' }}>notes as memory</strong> — builds context from note content<br />

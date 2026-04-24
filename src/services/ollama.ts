@@ -1,4 +1,4 @@
-import type { Note, AISettings } from '../types';
+import type { Note, AIAction, AISettings } from '../types';
 
 // ============================================================
 // Flint AI Service — 3-Level Fallback
@@ -132,7 +132,7 @@ export async function askFlintAI(
   settings: AISettings,
   chatHistory: { role: string; content: string }[],
   onChunk: (chunk: string) => void,
-  onDone: (fullContent: string, webResults?: string, usedOllama?: boolean) => void,
+  onDone: (fullContent: string, webResults?: string, usedOllama?: boolean, actions?: AIAction[]) => void,
   onError: (err: string) => void,
 ): Promise<void> {
   const notesData = notes.map(n => ({
@@ -151,6 +151,10 @@ export async function askFlintAI(
       ollamaUrl: settings.ollamaUrl || DEFAULT_OLLAMA,
       apiKey: settings.apiKey,
       apiBaseUrl: settings.apiBaseUrl,
+      localModelPath: settings.localModelPath,
+      localModelContext: settings.localModelContext,
+      localModelThreads: settings.localModelThreads,
+      maxOutputTokens: settings.maxOutputTokens,
       temperature: settings.temperature,
       maxContextNotes: settings.maxContextNotes,
       internetAccess: settings.internetAccess,
@@ -204,7 +208,7 @@ export async function askFlintAI(
             if (data.error && !fullContent) {
               onError(data.error);
             } else {
-              onDone(fullContent, data.webResults || undefined, data.usedOllama ?? true);
+              onDone(fullContent, data.webResults || undefined, data.usedOllama ?? true, data.actions || undefined);
             }
             return;
           }
@@ -335,6 +339,31 @@ function getBuiltinResponse(
   const noteMap = new Map(notes.map(n => [n.id, n]));
   const activeNote = noteMap.get(activeNoteId || '');
 
+  const greetingMatch = q.match(/^\s*(hi|hello|hey|yo|good (morning|afternoon|evening))\b/);
+  if (greetingMatch) {
+    const noteCount = notes.length;
+    return activeNote
+      ? `Hi. You are viewing "${activeNote.title}". I can help edit notes, summarize them, or find links. You have ${noteCount} notes.`
+      : `Hi. I can help edit notes, summarize them, or find links. You have ${noteCount} notes.`;
+  }
+
+  if (q === 'reply' || q === 'replay' || q.includes('reply to this')) {
+    return activeNote
+      ? `I’m on the active note "${activeNote.title}". Tell me what change you want.`
+      : 'Tell me which note you want to work on.';
+  }
+
+  if (q.includes('help') || q === '?') {
+    return 'I can greet you, summarize notes, find links, rename notes, update note content, create notes, and delete notes.';
+  }
+
+  const shortIntent = (text: string) => /^(summarize|summary|list|show|find|search|rename|update|edit|create|delete|remove|add|what|how)\b/.test(text);
+  if (!shortIntent(q) && q.length <= 24) {
+    return activeNote
+      ? `Ask me to summarize, edit, rename, or find links in "${activeNote.title}".`
+      : 'Ask me to summarize, edit, rename, or find links in your notes.';
+  }
+
   // Build graph
   const graph = new Map<string, Set<string>>();
   notes.forEach(n => graph.set(n.id, new Set()));
@@ -352,18 +381,18 @@ function getBuiltinResponse(
   const totalConns = [...graph.values()].reduce((sum, s) => sum + s.size, 0) / 2;
 
   // Help
-  if (q.includes('help') || q.includes('what can you')) {
-    return `I'm **Flint AI** — your note assistant!\n\n**I can do:**\n- List all your notes and connections\n- Search your vault by keywords\n- Show tags and topics\n- Answer questions about your notes\n- Summarize note contents\n\n**For full AI power:**\nInstall Ollama and run a model:\n\`\`\`\ncurl -fsSL https://ollama.ai/install.sh | sh\nollama pull llama3.2\n\`\`\`\nThen restart Flint. I'll automatically use Ollama for smarter responses.`;
+  if (q.includes('what can you')) {
+    return 'I can summarize notes, find links, rename a note, update content, create a note, and delete a note when you ask clearly.';
   }
 
   // List notes
   if ((q.includes('list') || q.includes('show') || q.includes('what')) && (q.includes('note') || q.includes('all') || q.includes('everything'))) {
     if (!notes.length) return 'Your vault is empty. Create some notes!';
-    let resp = `You have **${notes.length} notes** with **${totalConns} connections**:\n\n`;
-    notes.sort((a, b) => (graph.get(b.id)?.size || 0) - (graph.get(a.id)?.size || 0));
-    notes.forEach(n => {
+    const rankedNotes = [...notes].sort((a, b) => (graph.get(b.id)?.size || 0) - (graph.get(a.id)?.size || 0));
+    let resp = `You have ${notes.length} notes and ${totalConns} connections. Top notes:\n`;
+    rankedNotes.slice(0, 8).forEach(n => {
       const conns = graph.get(n.id)?.size || 0;
-      resp += `- **${n.title}** (${conns} link${conns !== 1 ? 's' : ''})\n`;
+      resp += `- ${n.title} (${conns} link${conns !== 1 ? 's' : ''})\n`;
     });
     return resp;
   }
@@ -372,11 +401,11 @@ function getBuiltinResponse(
   if (q.includes('connection') || q.includes('graph') || q.includes('link')) {
     const connected = [...graph.entries()].filter(([, c]) => c.size > 0);
     if (!connected.length) return 'No connections yet. Use `[[Note Name]]` to link notes together!';
-    let resp = `**${connected.length} notes** with connections:\n\n`;
+    let resp = `${connected.length} notes have connections. Top links:\n`;
     connected.sort((a, b) => b[1].size - a[1].size);
-    for (const [nid, conns] of connected) {
+    for (const [nid, conns] of connected.slice(0, 8)) {
       const names = [...conns].map(id => noteMap.get(id)?.title).filter(Boolean);
-      resp += `- **${noteMap.get(nid)?.title}** → ${names.join(', ')}\n`;
+      resp += `- ${noteMap.get(nid)?.title}: ${names.join(', ')}\n`;
     }
     return resp;
   }
@@ -393,9 +422,9 @@ function getBuiltinResponse(
       }
     });
     if (!allTags.size) return 'No tags found. Use `#tag` to categorize notes.';
-    let resp = `**${allTags.size} tags** found:\n\n`;
-    for (const [tag, noteList] of allTags) {
-      resp += `- **#${tag}** (${noteList.length} note${noteList.length > 1 ? 's' : ''}): ${noteList.join(', ')}\n`;
+    let resp = `${allTags.size} tags found. Top tags:\n`;
+    for (const [tag, noteList] of [...allTags.entries()].slice(0, 8)) {
+      resp += `- #${tag} (${noteList.length} note${noteList.length > 1 ? 's' : ''}): ${noteList.join(', ')}\n`;
     }
     return resp;
   }
@@ -403,10 +432,10 @@ function getBuiltinResponse(
   // Summarize
   if (q.includes('summarize') || q.includes('summary')) {
     if (!notes.length) return 'Nothing to summarize — vault is empty.';
-    let resp = `**Summary of your vault** (${notes.length} notes, ${totalConns} connections):\n\n`;
+    let resp = `Vault summary: ${notes.length} notes, ${totalConns} connections. Key notes:\n`;
     notes.slice(0, 8).forEach(n => {
       const firstLine = n.content.split('\n').find(l => l.trim() && !l.startsWith('#')) || '';
-      resp += `**${n.title}**: ${firstLine.slice(0, 120)}${firstLine.length > 120 ? '...' : ''}\n\n`;
+      resp += `- ${n.title}: ${firstLine.slice(0, 90)}${firstLine.length > 90 ? '...' : ''}\n`;
     });
     return resp;
   }
@@ -420,31 +449,30 @@ function getBuiltinResponse(
 
   if (matched.length > 0) {
     let resp = activeNote
-      ? `Based on your vault (viewing **"${activeNote?.title}"**):\n\n`
-      : `Found **${matched.length}** relevant notes:\n\n`;
+      ? `Viewing "${activeNote?.title}". Related notes:\n`
+      : `Found ${matched.length} relevant notes:\n`;
 
     matched.slice(0, 5).forEach(n => {
       const conns = [...(graph.get(n.id) || [])].map(id => noteMap.get(id)?.title).filter(Boolean);
-      resp += `### ${n.title}\n`;
-      if (conns.length) resp += `*Connected to: ${conns.join(', ')}*\n`;
+      resp += `- ${n.title}${conns.length ? ` (linked to ${conns.join(', ')})` : ''}\n`;
       const paragraphs = n.content.split('\n\n').filter(p => p.trim());
-      const relevant = paragraphs.filter(p => words.some(w => p.toLowerCase().includes(w)));
-      resp += (relevant.length ? relevant : paragraphs).slice(0, 2).join('\n\n');
-      resp += '\n\n';
+      const relevant = paragraphs.filter(p => words.some(w => p.toLowerCase().includes(w))).slice(0, 1);
+      const snippet = (relevant.length ? relevant : paragraphs.slice(0, 1))[0] || '';
+      resp += `  ${snippet.slice(0, 160)}${snippet.length > 160 ? '...' : ''}\n`;
     });
 
     if (matched.length > 5) resp += `...and ${matched.length - 5} more.\n`;
-    resp += `\n*Found across ${notes.length} notes with ${totalConns} connections.*`;
+    resp += `\nFound across ${notes.length} notes with ${totalConns} connections.`;
     return resp;
   }
 
   // Default
-  let resp = `I searched all **${notes.length} notes** but couldn't find anything matching "${query}".\n\n`;
+  let resp = `I couldn't find a direct match for "${query}".\n`;
   if (notes.length > 0) {
-    resp += '**Your vault contains:**\n';
-    notes.slice(0, 8).forEach(n => { resp += `- ${n.title}\n`; });
-    if (notes.length > 8) resp += `...and ${notes.length - 8} more\n`;
+    resp += 'Try one of these notes:\n';
+    notes.slice(0, 6).forEach(n => { resp += `- ${n.title}\n`; });
+    if (notes.length > 6) resp += `...and ${notes.length - 6} more\n`;
   }
-  resp += '\n*Install Ollama for full AI-powered responses.*';
+  resp += 'Ask for summarize, list notes, links, rename, or update note.';
   return resp;
 }

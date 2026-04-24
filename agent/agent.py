@@ -5,6 +5,7 @@ Runs on http://localhost:5100
 """
 
 import json
+import os
 import time
 import threading
 import requests
@@ -16,6 +17,19 @@ CORS(app, origins="*")
 
 OLLAMA_URL = "http://localhost:11434"
 AGENT_PORT = 5100
+
+try:
+    from llama_cpp import Llama
+except Exception:
+    Llama = None
+
+LOCAL_MODEL_CACHE = {
+    "path": None,
+    "ctx": None,
+    "threads": None,
+    "llm": None,
+}
+LOCAL_MODEL_LOCK = threading.Lock()
 
 
 # ── Health Check ──────────────────────────────────────────────
@@ -112,6 +126,104 @@ def needs_internet(query):
     return any(kw in q for kw in keywords)
 
 
+def is_note_edit_request(query):
+    q = query.lower()
+    keywords = [
+        "rename note", "rename this note", "change note", "edit note", "update note",
+        "modify note", "fix note", "rewrite note", "append to note", "replace in note",
+        "create note", "add note", "delete note", "remove note", "make this note",
+    ]
+    return any(kw in q for kw in keywords)
+
+
+def extract_json_object(text):
+    text = (text or "").strip()
+    if text.startswith("```"):
+        text = text.strip("`")
+        if text.lower().startswith("json"):
+            text = text[4:].strip()
+    try:
+        return json.loads(text)
+    except Exception:
+        import re
+        match = re.search(r'\{.*\}', text, re.S)
+        if not match:
+            return None
+        try:
+            return json.loads(match.group(0))
+        except Exception:
+            return None
+
+
+def summarize_actions(actions):
+    if not actions:
+        return "I reviewed your request, but I couldn't identify a safe note change."
+    parts = []
+    for action in actions[:3]:
+        action_type = action.get("type", "")
+        if action_type == "rename_note":
+            parts.append(f'Renamed the note to "{action.get("title", "")}"')
+        elif action_type == "update_note":
+            parts.append("Updated the selected note content")
+        elif action_type == "create_note":
+            parts.append(f'Created a new note titled "{action.get("title", "Untitled")}"')
+        elif action_type == "delete_note":
+            parts.append("Deleted the selected note")
+    if not parts:
+        return "I reviewed your request, but I couldn't identify a safe note change."
+    return "; ".join(parts) + "."
+
+
+def concise_note_reply(notes, query, active_note_id, memory, max_notes=5):
+    note_map = {n["id"]: n for n in notes}
+    active_note = note_map.get(active_note_id)
+    q = query.lower().strip()
+
+    if not notes:
+      return "Your vault is empty. Create a note to get started."
+
+    if any(kw in q for kw in ["summarize", "summary", "what are my notes about", "main topics"]):
+        titles = [n["title"] for n in notes[:max_notes]]
+        return "Main topics: " + ", ".join(titles) + ("." if titles else "")
+
+    if active_note:
+        return f'About "{active_note["title"]}": {active_note["content"].splitlines()[0][:140]}'
+
+    top_titles = [n["title"] for n in notes[:max_notes]]
+    return "Relevant notes: " + ", ".join(top_titles) + "."
+
+
+def build_concise_system_prompt(system_prompt, memory, web_results=""):
+    prompt = (
+        f"{system_prompt}\n\n"
+        f"Answer briefly and clearly. Keep responses short, specific, and useful. "
+        f"Do not print whole notes unless the user explicitly asks for them. "
+        f"Prefer 1 short paragraph or up to 4 bullets.\n\n"
+        f"{memory}"
+    )
+    if web_results:
+        prompt += (
+            f"\n\n=== INTERNET ACCESS ===\n"
+            f"Use these web results only if needed:\n{web_results}\n"
+            f"Cite them briefly and do not copy long excerpts."
+        )
+    return prompt
+
+
+def build_edit_prompt(system_prompt, memory, query):
+    return (
+        f"{system_prompt}\n\n"
+        f"You are in note-edit mode. Return ONLY valid JSON with this schema:\n"
+        f'{{"summary":"short user-facing summary","actions":[{{"type":"update_note|rename_note|create_note|delete_note","target":"active|id|title","noteId":"optional","matchTitle":"optional","title":"optional","content":"optional"}}]}}\n\n'
+        f"Rules:\n"
+        f"- Keep the summary short and factual.\n"
+        f"- Only include actions you are confident about.\n"
+        f"- If unsure, return {{\"summary\":\"I could not identify a safe note change.\",\"actions\":[]}}.\n"
+        f"- Do not add markdown fences or extra text.\n\n"
+        f"{memory}\n\nQuery: {query}"
+    )
+
+
 def stream_text_chunks(text, chunk_size=3):
     """Yield SSE chunks for plain text responses."""
     for i in range(0, len(text), chunk_size):
@@ -133,7 +245,7 @@ def resolve_openai_base_url(provider, api_base_url):
     return f"{base}/chat/completions"
 
 
-def call_openai_compatible(provider, api_key, api_base_url, model, messages, temperature):
+def call_openai_compatible(provider, api_key, api_base_url, model, messages, temperature, max_tokens=180):
     """Call OpenAI/OpenAI-compatible chat completion API."""
     endpoint = resolve_openai_base_url(provider, api_base_url)
     if not model:
@@ -151,6 +263,7 @@ def call_openai_compatible(provider, api_key, api_base_url, model, messages, tem
             "model": model,
             "messages": messages,
             "temperature": temperature,
+            "max_tokens": max(32, int(max_tokens)),
         },
         timeout=120,
     )
@@ -169,7 +282,7 @@ def call_openai_compatible(provider, api_key, api_base_url, model, messages, tem
     return str(content or "")
 
 
-def call_gemini(api_key, model, system_content, history, query, temperature):
+def call_gemini(api_key, model, system_content, history, query, temperature, max_tokens=180):
     """Call Gemini generateContent API."""
     selected_model = model or "gemini-1.5-flash"
     endpoint = f"https://generativelanguage.googleapis.com/v1beta/models/{selected_model}:generateContent?key={api_key}"
@@ -194,6 +307,7 @@ def call_gemini(api_key, model, system_content, history, query, temperature):
             "contents": contents,
             "generationConfig": {
                 "temperature": temperature,
+                "maxOutputTokens": max(32, int(max_tokens)),
             },
         },
         timeout=120,
@@ -210,6 +324,65 @@ def call_gemini(api_key, model, system_content, history, query, temperature):
     parts = candidates[0].get("content", {}).get("parts", [])
     text = "\n".join(part.get("text", "") for part in parts if isinstance(part, dict))
     return text or ""
+
+
+def get_local_llm(model_path, n_ctx, n_threads):
+    if Llama is None:
+        raise RuntimeError("llama-cpp-python is not installed. Run: pip install llama-cpp-python")
+    if not model_path:
+        raise RuntimeError("Local model path is empty")
+    if not os.path.exists(model_path):
+        raise RuntimeError(f"Local model not found: {model_path}")
+
+    with LOCAL_MODEL_LOCK:
+        if (
+            LOCAL_MODEL_CACHE["llm"] is not None
+            and LOCAL_MODEL_CACHE["path"] == model_path
+            and LOCAL_MODEL_CACHE["ctx"] == n_ctx
+            and LOCAL_MODEL_CACHE["threads"] == n_threads
+        ):
+            return LOCAL_MODEL_CACHE["llm"]
+
+        llm = Llama(
+            model_path=model_path,
+            n_ctx=max(512, int(n_ctx)),
+            n_threads=max(1, int(n_threads)),
+            verbose=False,
+        )
+        LOCAL_MODEL_CACHE["path"] = model_path
+        LOCAL_MODEL_CACHE["ctx"] = n_ctx
+        LOCAL_MODEL_CACHE["threads"] = n_threads
+        LOCAL_MODEL_CACHE["llm"] = llm
+        return llm
+
+
+def call_local_gguf(model_path, messages, temperature, max_tokens, n_ctx, n_threads):
+    llm = get_local_llm(model_path, n_ctx, n_threads)
+
+    prompt_parts = []
+    for msg in messages[-12:]:
+        role = msg.get("role", "user")
+        content = msg.get("content", "")
+        if not content:
+            continue
+        if role == "system":
+            prompt_parts.append(f"System:\n{content}")
+        elif role == "assistant":
+            prompt_parts.append(f"Assistant:\n{content}")
+        else:
+            prompt_parts.append(f"User:\n{content}")
+    prompt_parts.append("Assistant:\n")
+    prompt = "\n\n".join(prompt_parts)
+
+    out = llm(
+        prompt,
+        max_tokens=max(32, int(max_tokens)),
+        temperature=max(0.0, min(float(temperature), 1.2)),
+        top_p=0.9,
+        repeat_penalty=1.05,
+        stop=["\nUser:", "\nSystem:"],
+    )
+    return out.get("choices", [{}])[0].get("text", "").strip()
 
 
 # ── Memory Builder ────────────────────────────────────────────
@@ -312,7 +485,7 @@ def build_memory(notes, active_note_id, query, max_notes=10):
         if neighbors:
             lines.append(f"Connected to: {', '.join(neighbors)}")
         content = adata["content"]
-        lines.append(content[:2000] + ("\n...[truncated]" if len(content) > 2000 else ""))
+        lines.append(content[:600] + ("\n...[truncated]" if len(content) > 600 else ""))
         lines.append("")
 
     # Related notes
@@ -328,7 +501,7 @@ def build_memory(notes, active_note_id, query, max_notes=10):
         if neighbors:
             lines.append(f"Connected to: {', '.join(neighbors)}")
         content = ndata["content"]
-        lines.append(content[:1000] + ("\n...[truncated]" if len(content) > 1000 else ""))
+        lines.append(content[:300] + ("\n...[truncated]" if len(content) > 300 else ""))
 
     return "\n".join(lines)
 
@@ -354,17 +527,36 @@ def builtin_response(query, notes, active_note_id):
 
     active_note = note_map.get(active_note_id)
 
+    if regex.match(r'^(hi|hello|hey|yo|good\s+(morning|afternoon|evening))\b', q):
+        if active_note:
+            return f'Hi. You are in "{active_note["title"]}". Ask me to summarize it, rename it, or update it.'
+        return 'Hi. Ask me to summarize notes, find links, rename a note, or update content.'
+
+    if q in ("reply", "replay") or "reply to" in q:
+        if active_note:
+            return f'I am ready to work on "{active_note["title"]}". Tell me the change you want.'
+        return 'Tell me which note to work on.'
+
+    if q in ("help", "what can you do", "what can you", "?"):
+        return 'I can summarize notes, list connections, find tags, rename notes, update note content, create notes, and delete notes.'
+
+    if len(q) <= 24 and not regex.match(r'^(summarize|summary|list|show|find|search|rename|update|edit|create|delete|remove|add|what|how)\b', q):
+        if active_note:
+            return f'Ask me to summarize, edit, rename, or find links in "{active_note["title"]}".'
+        return 'Ask me to summarize, edit, rename, or find links in your notes.'
+
     # List notes
     if any(kw in q for kw in ["list", "show", "all note"]):
         if "note" in q or "all" in q or "everything" in q:
             if not notes:
                 return "Your vault is empty. Create some notes to get started!"
-            resp = f"You have **{len(notes)} notes** in your vault:\n\n"
-            for n in notes:
+            resp = f'You have {len(notes)} notes in your vault. Top notes:\n'
+            ranked = sorted(notes, key=lambda n: len(graph.get(n["id"], set())), reverse=True)
+            for n in ranked[:8]:
                 conns = len(graph.get(n["id"], set()))
-                resp += f"- **{n['title']}** ({conns} connection{'s' if conns != 1 else ''})\n"
+                resp += f"- {n['title']} ({conns} connection{'s' if conns != 1 else ''})\n"
             total_conns = sum(len(v) for v in graph.values()) // 2
-            resp += f"\nTotal connections: {total_conns}"
+            resp += f"Total connections: {total_conns}"
             return resp
 
     # Connections
@@ -373,10 +565,10 @@ def builtin_response(query, notes, active_note_id):
         connected.sort(key=lambda x: len(x[1]), reverse=True)
         if not connected:
             return "No connections found. Use `[[Note Name]]` syntax to link notes together."
-        resp = f"**{len(connected)} notes** have connections:\n\n"
-        for nid, conns in connected:
+        resp = f'{len(connected)} notes have connections. Top links:\n'
+        for nid, conns in connected[:8]:
             names = [note_map[cid]["title"] for cid in conns if cid in note_map]
-            resp += f'- **{note_map[nid]["title"]}** → {", ".join(names)}\n'
+            resp += f'- {note_map[nid]["title"]}: {", ".join(names)}\n'
         return resp
 
     # Tags
@@ -388,29 +580,14 @@ def builtin_response(query, notes, active_note_id):
                 all_tags.setdefault(tag, []).append(n["title"])
         if not all_tags:
             return "No tags found. Use `#tag` syntax to tag your notes."
-        resp = f"**{len(all_tags)} tags** found:\n\n"
-        for tag, note_list in all_tags.items():
-            resp += f'- **#{tag}** ({len(note_list)} note{"s" if len(note_list) > 1 else ""}): {", ".join(note_list)}\n'
+        resp = f'{len(all_tags)} tags found. Top tags:\n'
+        for tag, note_list in list(all_tags.items())[:8]:
+            resp += f'- #{tag} ({len(note_list)} note{"s" if len(note_list) > 1 else ""}): {", ".join(note_list)}\n'
         return resp
 
     # Help
     if "help" in q or "what can you" in q:
-        return """I'm **Flint AI** — I can help you with your notes!
-
-**Things I can do:**
-- List all your notes and connections
-- Search through your vault
-- Summarize note contents
-- Show the connection graph
-- Find related topics
-- Answer questions about your notes
-
-**Tips:**
-- Use `[[Note Name]]` to connect notes
-- Use `#tag` to categorize
-- Open Graph View (Ctrl+G) to visualize connections
-
-**For smarter AI:** Install [Ollama](https://ollama.ai) and run a model like `llama3.2` or `mistral` for full AI-powered responses."""
+        return 'I can summarize notes, list connections, find tags, rename notes, update note content, create notes, and delete notes.'
 
     # Search notes
     search_words = [w for w in regex.sub(r'[?.,!]', '', q).split() if len(w) > 2]
@@ -423,37 +600,36 @@ def builtin_response(query, notes, active_note_id):
     if matched:
         resp = ""
         if active_note:
-            resp += f'Based on your vault (currently viewing **"{active_note["title"]}"**):\n\n'
+            resp += f'Viewing "{active_note["title"]}". Related notes:\n'
         else:
-            resp += "Based on your vault:\n\n"
+            resp += "Related notes:\n"
         for n in matched[:5]:
             conns = [note_map[cid]["title"] for cid in graph.get(n["id"], set()) if cid in note_map]
-            resp += f"### {n['title']}\n"
-            if conns:
-                resp += f"*Connected to: {', '.join(conns)}*\n"
+            linked_suffix = f" (linked to {', '.join(conns)})" if conns else ""
+            resp += f"- {n['title']}{linked_suffix}\n"
             content = n.get("content", "")
             paragraphs = content.split("\n\n")
             relevant = [p for p in paragraphs if any(w in p.lower() for w in search_words)]
             if relevant:
-                resp += "\n\n".join(relevant[:3])
+                snippet = relevant[0]
             else:
-                resp += "\n\n".join(paragraphs[:2])
-            resp += "\n\n"
+                snippet = paragraphs[0] if paragraphs else ""
+            resp += f"  {snippet[:160]}{'...' if len(snippet) > 160 else ''}\n"
         if len(matched) > 5:
             resp += f"...and {len(matched) - 5} more related notes.\n"
         total_conns = sum(len(v) for v in graph.values()) // 2
-        resp += f"\n*Found {len(matched)} relevant notes across {len(notes)} total notes with {total_conns} connections.*"
+        resp += f"Found {len(matched)} relevant notes across {len(notes)} notes with {total_conns} connections."
         return resp
 
     # Default
-    resp = f'I searched through your **{len(notes)} notes** but couldn\'t find anything specifically matching "{query}".\n\n'
+    resp = f'I could not find a direct match for "{query}".\n'
     if notes:
-        resp += "**Your vault contains:**\n"
-        for n in notes[:8]:
+        resp += "Try one of these notes:\n"
+        for n in notes[:6]:
             resp += f"- {n['title']}\n"
-        if len(notes) > 8:
-            resp += f"...and {len(notes) - 8} more\n"
-    resp += "\n*Tip: For smarter AI responses, install Ollama and run a model.*"
+        if len(notes) > 6:
+            resp += f"...and {len(notes) - 6} more\n"
+    resp += "Ask me to summarize, edit, rename, or find links in your notes."
     return resp
 
 
@@ -477,6 +653,10 @@ def chat():
     ollama_url = settings.get("ollamaUrl", OLLAMA_URL)
     api_key = str(settings.get("apiKey", "") or "").strip()
     api_base_url = str(settings.get("apiBaseUrl", "") or "").strip()
+    local_model_path = str(settings.get("localModelPath", "") or "").strip()
+    local_model_context = int(settings.get("localModelContext", 2048) or 2048)
+    local_model_threads = int(settings.get("localModelThreads", 4) or 4)
+    max_output_tokens = int(settings.get("maxOutputTokens", 180) or 180)
     temperature = settings.get("temperature", 0.7)
     max_context = settings.get("maxContextNotes", 10)
     internet_access = settings.get("internetAccess", True)
@@ -490,11 +670,15 @@ def chat():
     if internet_access and needs_internet(query):
         web_results = web_search(query)
 
+    edit_request = is_note_edit_request(query)
+
     # If no model, use built-in
     if provider == "ollama" and (not model or not model.strip()):
-        response_text = builtin_response(query, notes, active_note_id)
-        if web_results:
-            response_text += f"\n\n---\n*Web search was performed but no AI model to process it. Install Ollama for full AI + web.*"
+        response_text = concise_note_reply(notes, query, active_note_id, memory, max_context)
+        if edit_request:
+            response_text = "I can suggest note changes, but Ollama is not configured."
+        elif web_results:
+            response_text += f"\n\n*Web search was performed, but no local model is available.*"
 
         def stream_builtin():
             for i in range(0, len(response_text), 3):
@@ -504,10 +688,8 @@ def chat():
 
         return Response(stream_builtin(), mimetype="text/event-stream")
 
-    # Use Ollama
-    system_content = f"{system_prompt}\n\n{memory}"
-    if web_results:
-        system_content += f"\n\n=== INTERNET ACCESS ===\nYou have internet access. Here are web search results:\n{web_results}\n\nUse these alongside your memory. Cite sources when using web information."
+    # Use Ollama / external provider
+    system_content = build_edit_prompt(system_prompt, memory, query) if edit_request else build_concise_system_prompt(system_prompt, memory, web_results)
 
     active_note = None
     for n in notes:
@@ -521,12 +703,75 @@ def chat():
         messages.append({"role": h.get("role", "user"), "content": h.get("content", "")})
     messages.append({"role": "user", "content": query})
 
-    # External providers (OpenAI / Gemini / OpenAI-compatible)
-    if provider != "ollama":
+    if edit_request:
+        def stream_edit_plan(response_text, used_ollama):
+            payload = extract_json_object(response_text)
+            if not payload:
+                summary = "I could not confidently identify a safe note change."
+                actions = []
+            else:
+                actions = payload.get("actions", []) if isinstance(payload, dict) else []
+                summary = payload.get("summary", "") if isinstance(payload, dict) else ""
+                if not summary:
+                    summary = summarize_actions(actions)
+            if actions:
+                summary += f"\n\nApplied {len(actions)} change{'s' if len(actions) != 1 else ''}."
+            for chunk in stream_text_chunks(summary, 3):
+                yield chunk
+            yield f"data: {json.dumps({'done': True, 'webResults': web_results or None, 'usedOllama': used_ollama, 'actions': actions})}\n\n"
+
+        try:
+            if provider == "ollama":
+                response = requests.post(
+                    f"{ollama_url}/api/chat",
+                    json={
+                        "model": model,
+                        "messages": messages,
+                        "stream": False,
+                        "options": {"temperature": min(temperature, 0.3), "num_ctx": 8192, "top_p": 0.8},
+                    },
+                    timeout=120,
+                )
+                if not response.ok:
+                    raise RuntimeError(f"Ollama error ({response.status_code})")
+                data = response.json()
+                text = data.get("message", {}).get("content", "")
+                return Response(stream_edit_plan(text, True), mimetype="text/event-stream")
+
+            if provider == "local-gguf":
+                text = call_local_gguf(
+                    model_path=local_model_path,
+                    messages=messages,
+                    temperature=min(temperature, 0.35),
+                    max_tokens=min(max_output_tokens, 320),
+                    n_ctx=local_model_context,
+                    n_threads=local_model_threads,
+                )
+                return Response(stream_edit_plan(text, True), mimetype="text/event-stream")
+
+            if provider in ("openai", "openai-compatible"):
+                text = call_openai_compatible(provider, api_key, api_base_url, model, messages, min(temperature, 0.3), max_output_tokens)
+                return Response(stream_edit_plan(text, True), mimetype="text/event-stream")
+
+            if provider == "gemini":
+                text = call_gemini(api_key, model, system_content, history, query, min(temperature, 0.3), max_output_tokens)
+                return Response(stream_edit_plan(text, True), mimetype="text/event-stream")
+        except Exception as e:
+            fallback = concise_note_reply(notes, query, active_note_id, memory, max_context)
+            fallback += f"\n\n*Unable to prepare note edits: {str(e)}*"
+
+            def stream_edit_failure():
+                for chunk in stream_text_chunks(fallback, 3):
+                    yield chunk
+                yield f"data: {json.dumps({'done': True, 'error': str(e), 'usedOllama': False, 'actions': []})}\n\n"
+
+            return Response(stream_edit_failure(), mimetype="text/event-stream")
+
+    if provider in ("openai", "openai-compatible", "gemini"):
         def stream_external():
             try:
                 if not api_key:
-                    fallback = builtin_response(query, notes, active_note_id)
+                    fallback = concise_note_reply(notes, query, active_note_id, memory, max_context)
                     fallback += "\n\n*Missing API key. Add it in AI settings to use this provider.*"
                     for chunk in stream_text_chunks(fallback):
                         yield chunk
@@ -541,6 +786,7 @@ def chat():
                         model=model,
                         messages=messages,
                         temperature=temperature,
+                        max_tokens=max_output_tokens,
                     )
                 elif provider == "gemini":
                     response_text = call_gemini(
@@ -550,21 +796,47 @@ def chat():
                         history=history,
                         query=query,
                         temperature=temperature,
+                        max_tokens=max_output_tokens,
                     )
                 else:
                     raise RuntimeError(f"Unsupported provider: {provider}")
 
-                for chunk in stream_text_chunks(response_text):
+                concise_text = response_text.strip() or concise_note_reply(notes, query, active_note_id, memory, max_context)
+                for chunk in stream_text_chunks(concise_text):
                     yield chunk
                 yield f"data: {json.dumps({'done': True, 'webResults': web_results or None, 'usedOllama': True})}\n\n"
             except Exception as e:
-                fallback = builtin_response(query, notes, active_note_id)
+                fallback = concise_note_reply(notes, query, active_note_id, memory, max_context)
                 fallback += f"\n\n*Provider request failed: {str(e)}*"
                 for chunk in stream_text_chunks(fallback):
                     yield chunk
                 yield f"data: {json.dumps({'done': True, 'error': str(e), 'usedOllama': False})}\n\n"
 
         return Response(stream_external(), mimetype="text/event-stream")
+
+    if provider == "local-gguf":
+        def stream_local_model():
+            try:
+                response_text = call_local_gguf(
+                    model_path=local_model_path,
+                    messages=messages,
+                    temperature=min(temperature, 0.45),
+                    max_tokens=max_output_tokens,
+                    n_ctx=local_model_context,
+                    n_threads=local_model_threads,
+                )
+                concise_text = response_text.strip() or concise_note_reply(notes, query, active_note_id, memory, max_context)
+                for chunk in stream_text_chunks(concise_text):
+                    yield chunk
+                yield f"data: {json.dumps({'done': True, 'webResults': web_results or None, 'usedOllama': True})}\n\n"
+            except Exception as e:
+                fallback = concise_note_reply(notes, query, active_note_id, memory, max_context)
+                fallback += f"\n\n*Local model error: {str(e)}*"
+                for chunk in stream_text_chunks(fallback):
+                    yield chunk
+                yield f"data: {json.dumps({'done': True, 'error': str(e), 'usedOllama': False})}\n\n"
+
+        return Response(stream_local_model(), mimetype="text/event-stream")
 
     def stream_ollama():
         try:
@@ -577,6 +849,7 @@ def chat():
                     "options": {
                         "temperature": temperature,
                         "num_ctx": 8192,
+                        "num_predict": max_output_tokens,
                         "top_p": 0.9,
                     },
                 },
@@ -596,7 +869,7 @@ def chat():
                     err_msg = f'Model "{model}" not found. Run: `ollama pull {model}`'
 
                 # Fall back to built-in
-                fallback = builtin_response(query, notes, active_note_id)
+                fallback = concise_note_reply(notes, query, active_note_id, memory, max_context)
                 for i in range(0, len(fallback), 3):
                     chunk = fallback[i:i+3]
                     yield f"data: {json.dumps({'content': chunk})}\n\n"
@@ -623,7 +896,7 @@ def chat():
 
         except requests.exceptions.ConnectionError:
             # Ollama not running — fall back to built-in
-            fallback = builtin_response(query, notes, active_note_id)
+            fallback = concise_note_reply(notes, query, active_note_id, memory, max_context)
             for i in range(0, len(fallback), 3):
                 chunk = fallback[i:i+3]
                 yield f"data: {json.dumps({'content': chunk})}\n\n"
@@ -633,7 +906,7 @@ def chat():
             yield f"data: {json.dumps({'done': True, 'error': 'Request timed out. Try a shorter query or faster model.'})}\n\n"
 
         except Exception as e:
-            fallback = builtin_response(query, notes, active_note_id)
+            fallback = concise_note_reply(notes, query, active_note_id, memory, max_context)
             for i in range(0, len(fallback), 3):
                 chunk = fallback[i:i+3]
                 yield f"data: {json.dumps({'content': chunk})}\n\n"

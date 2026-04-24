@@ -3,6 +3,7 @@ import { useStore } from '../store';
 import { askFlintAI, fetchOllamaModels, checkOllamaStatus, checkAgentStatus } from '../services/ollama';
 import { FlintLogo } from './FlintLogo';
 import { X, Send, Trash2, User, Loader2, Settings, Wifi, Globe, Brain, BookOpen, Network, Sparkles, Zap, Cpu, Server, AlertTriangle } from 'lucide-react';
+import type { AIAction } from '../types';
 
 export function AIChat() {
   const { state, dispatch } = useStore();
@@ -18,6 +19,8 @@ export function AIChat() {
   const messagesEndRef = useRef<HTMLDivElement>(null);
   const inputRef = useRef<HTMLTextAreaElement>(null);
   const abortRef = useRef(false);
+  const messagesContainerRef = useRef<HTMLDivElement>(null);
+  const shouldAutoScrollRef = useRef(true);
 
   const { aiMessages, aiSettings, notes, activeNoteId } = state;
 
@@ -72,12 +75,72 @@ export function AIChat() {
 
   // Scroll to bottom
   useEffect(() => {
-    messagesEndRef.current?.scrollIntoView({ behavior: 'smooth' });
+    if (shouldAutoScrollRef.current) {
+      messagesEndRef.current?.scrollIntoView({ behavior: 'smooth' });
+    }
   }, [aiMessages, streamContent]);
 
+  const handleMessagesScroll = () => {
+    const el = messagesContainerRef.current;
+    if (!el) return;
+    const distanceFromBottom = el.scrollHeight - el.scrollTop - el.clientHeight;
+    shouldAutoScrollRef.current = distanceFromBottom < 120;
+  };
+
+  const resolveTargetNoteId = (action: AIAction): string | null => {
+    if (action.target === 'active') return activeNoteId;
+    if (action.target === 'id' && action.noteId) return action.noteId;
+    if (action.target === 'title' && action.matchTitle) {
+      const match = notes.find(n => n.title.toLowerCase() === action.matchTitle!.toLowerCase());
+      return match?.id || null;
+    }
+    return activeNoteId;
+  };
+
+  const applyAIActions = (actions: AIAction[]) => {
+    const summaries: string[] = [];
+    actions.forEach(action => {
+      if (action.type === 'rename_note') {
+        const noteId = resolveTargetNoteId(action);
+        if (!noteId || !action.title) return;
+        dispatch({ type: 'RENAME_NOTE', payload: { id: noteId, title: action.title } });
+        summaries.push(`Renamed note to "${action.title}"`);
+      }
+      if (action.type === 'update_note') {
+        const noteId = resolveTargetNoteId(action);
+        if (!noteId || !action.content) return;
+        dispatch({ type: 'UPDATE_NOTE', payload: { id: noteId, content: action.content } });
+        summaries.push('Updated note content');
+      }
+      if (action.type === 'create_note' && action.title) {
+        const newNote = {
+          id: Math.random().toString(36).slice(2) + Date.now().toString(36),
+          title: action.title,
+          content: action.content || '# ' + action.title + '\n\n',
+          folderId: null,
+          pinned: false,
+          createdAt: Date.now(),
+          updatedAt: Date.now(),
+        };
+        dispatch({ type: 'ADD_NOTE', payload: newNote });
+        summaries.push(`Created note "${action.title}"`);
+      }
+      if (action.type === 'delete_note') {
+        const noteId = resolveTargetNoteId(action);
+        if (!noteId) return;
+        dispatch({ type: 'DELETE_NOTE', payload: noteId });
+        summaries.push('Deleted a note');
+      }
+    });
+    return summaries;
+  };
+
   const activeNote = notes.find(n => n.id === activeNoteId);
-  const isApiProvider = aiSettings.provider !== 'ollama';
+  const isCredentialProvider = aiSettings.provider === 'openai' || aiSettings.provider === 'gemini' || aiSettings.provider === 'openai-compatible';
+  const isLocalProvider = aiSettings.provider === 'local-gguf';
+  const isApiProvider = isCredentialProvider;
   const hasApiConfig = !!aiSettings.apiKey && !!aiSettings.model;
+  const hasLocalConfig = !!aiSettings.localModelPath;
 
   const sendMessage = useCallback(async () => {
     const trimmed = input.trim();
@@ -109,12 +172,14 @@ export function AIChat() {
         if (abortRef.current) return;
         setStreamContent(prev => prev + chunk);
       },
-      (fullContent, webResults, usedOllama) => {
+      (fullContent, webResults, usedOllama, actions) => {
         if (abortRef.current) return;
+        const actionSummaries = actions?.length ? applyAIActions(actions) : [];
+        const actionSuffix = actionSummaries.length ? `\n\nChanges: ${actionSummaries.join('; ')}.` : '';
         const assistantMsg = {
           id: Math.random().toString(36).slice(2) + Date.now().toString(36),
           role: 'assistant' as const,
-          content: fullContent,
+          content: fullContent + actionSuffix,
           timestamp: Date.now(),
           webResults: usedOllama ? webResults : undefined,
         };
@@ -162,7 +227,8 @@ export function AIChat() {
   const isAgentMode = agentStatus === 'agent-up';
   const isOllamaMode = isAgentMode && aiSettings.provider === 'ollama' && ollamaStatus === 'connected' && !!aiSettings.model;
   const isCloudMode = isAgentMode && isApiProvider && hasApiConfig;
-  const providerName = aiSettings.provider === 'openai' ? 'OpenAI' : aiSettings.provider === 'gemini' ? 'Gemini' : aiSettings.provider === 'openai-compatible' ? 'Custom API' : 'Ollama';
+  const isLocalMode = isAgentMode && isLocalProvider && hasLocalConfig;
+  const providerName = aiSettings.provider === 'openai' ? 'OpenAI' : aiSettings.provider === 'gemini' ? 'Gemini' : aiSettings.provider === 'openai-compatible' ? 'Custom API' : aiSettings.provider === 'local-gguf' ? 'Local GGUF' : 'Ollama';
 
   return (
     <div style={{
@@ -184,10 +250,12 @@ export function AIChat() {
         </div>
         <div style={{ flex: 1 }}>
           <div style={{ fontSize: 12, fontWeight: 600, color: '#aaa' }}>Flint AI</div>
-          <div className="flex items-center gap-1" style={{ fontSize: 10, color: isOllamaMode || isCloudMode ? '#5a5' : isAgentMode ? '#855' : '#655' }}>
-            {(isOllamaMode || isCloudMode) ? <Wifi size={8} /> : isAgentMode ? <Server size={8} /> : <Cpu size={8} />}
+          <div className="flex items-center gap-1" style={{ fontSize: 10, color: isOllamaMode || isCloudMode || isLocalMode ? '#5a5' : isAgentMode ? '#855' : '#655' }}>
+            {(isOllamaMode || isCloudMode || isLocalMode) ? <Wifi size={8} /> : isAgentMode ? <Server size={8} /> : <Cpu size={8} />}
             {isOllamaMode
               ? `Ollama · ${aiSettings.model}`
+              : isLocalMode
+              ? `Local GGUF · ${aiSettings.localModelPath.split('/').pop() || 'model.gguf'}`
               : isCloudMode
               ? `${providerName} · ${aiSettings.model}`
               : isAgentMode
@@ -246,19 +314,24 @@ export function AIChat() {
           <div style={{ fontSize: 10, color: '#555', marginBottom: 8, padding: '4px 8px', background: '#0a0a0a', borderRadius: 4, border: '1px solid #1a1a1a' }}>
             {isOllamaMode
               ? `Agent + Ollama (${aiSettings.model}) — full AI`
+              : isLocalMode
+              ? `Agent + Local GGUF (${aiSettings.localModelPath.split('/').pop() || 'model.gguf'}) — full AI`
               : isCloudMode
               ? `Agent + ${providerName} (${aiSettings.model}) — full AI`
               : isAgentMode
-              ? isApiProvider
+              ? isLocalProvider
+                ? 'Agent running — set GGUF model path to enable local model'
+                : isApiProvider
                 ? `Agent running — add API key + model for ${providerName}`
                 : `Agent running — no Ollama. Install: ollama pull llama3.2`
               : `Agent not running. Run: python3 ~/.flint/agent/agent.py`}
           </div>
           <ConfigField label="Provider">
             <select value={aiSettings.provider}
-              onChange={e => dispatch({ type: 'UPDATE_AI_SETTINGS', payload: { provider: e.target.value as 'ollama' | 'openai' | 'gemini' | 'openai-compatible' } })}
+              onChange={e => dispatch({ type: 'UPDATE_AI_SETTINGS', payload: { provider: e.target.value as 'ollama' | 'openai' | 'gemini' | 'openai-compatible' | 'local-gguf' } })}
               style={{ ...inputStyle, fontSize: 11 }}>
               <option value="ollama">Ollama (local)</option>
+              <option value="local-gguf">Local GGUF file</option>
               <option value="openai">OpenAI</option>
               <option value="gemini">Gemini</option>
               <option value="openai-compatible">OpenAI-compatible</option>
@@ -275,6 +348,30 @@ export function AIChat() {
                 onChange={e => dispatch({ type: 'UPDATE_AI_SETTINGS', payload: { apiKey: e.target.value } })}
                 placeholder={aiSettings.provider === 'openai' ? 'sk-...' : aiSettings.provider === 'gemini' ? 'AIza...' : 'Provider API key'}
                 style={{ ...inputStyle, fontSize: 11 }} />
+            </ConfigField>
+          )}
+          {isLocalProvider && (
+            <ConfigField label="GGUF path">
+              <input type="text" value={aiSettings.localModelPath}
+                onChange={e => dispatch({ type: 'UPDATE_AI_SETTINGS', payload: { localModelPath: e.target.value } })}
+                placeholder="/path/to/model.gguf"
+                style={{ ...inputStyle, fontSize: 11 }} />
+            </ConfigField>
+          )}
+          {isLocalProvider && (
+            <ConfigField label="Local ctx">
+              <input type="range" min={512} max={8192} step={256} value={aiSettings.localModelContext}
+                onChange={e => dispatch({ type: 'UPDATE_AI_SETTINGS', payload: { localModelContext: parseInt(e.target.value) } })}
+                style={{ flex: 1, accentColor: '#666' }} />
+              <span style={{ fontSize: 10, color: '#555', width: 44, textAlign: 'right' }}>{aiSettings.localModelContext}</span>
+            </ConfigField>
+          )}
+          {isLocalProvider && (
+            <ConfigField label="Threads">
+              <input type="range" min={1} max={16} step={1} value={aiSettings.localModelThreads}
+                onChange={e => dispatch({ type: 'UPDATE_AI_SETTINGS', payload: { localModelThreads: parseInt(e.target.value) } })}
+                style={{ flex: 1, accentColor: '#666' }} />
+              <span style={{ fontSize: 10, color: '#555', width: 24, textAlign: 'right' }}>{aiSettings.localModelThreads}</span>
             </ConfigField>
           )}
           {aiSettings.provider === 'openai-compatible' && (
@@ -296,7 +393,7 @@ export function AIChat() {
             ) : (
               <input type="text" value={aiSettings.model}
                 onChange={e => dispatch({ type: 'UPDATE_AI_SETTINGS', payload: { model: e.target.value } })}
-                placeholder={aiSettings.provider === 'openai' ? 'e.g. gpt-4o-mini' : aiSettings.provider === 'gemini' ? 'e.g. gemini-1.5-flash' : aiSettings.provider === 'openai-compatible' ? 'Provider model id' : 'e.g. llama3.2, mistral, codellama'}
+                placeholder={aiSettings.provider === 'openai' ? 'e.g. gpt-4o-mini' : aiSettings.provider === 'gemini' ? 'e.g. gemini-1.5-flash' : aiSettings.provider === 'openai-compatible' ? 'Provider model id' : aiSettings.provider === 'local-gguf' ? 'Optional alias' : 'e.g. llama3.2, mistral, codellama'}
                 style={{ ...inputStyle, fontSize: 11 }} />
             )}
           </ConfigField>
@@ -311,6 +408,12 @@ export function AIChat() {
               onChange={e => dispatch({ type: 'UPDATE_AI_SETTINGS', payload: { temperature: parseInt(e.target.value) / 100 } })}
               style={{ flex: 1, accentColor: '#666' }} />
             <span style={{ fontSize: 10, color: '#555', width: 30, textAlign: 'right' }}>{aiSettings.temperature.toFixed(2)}</span>
+          </ConfigField>
+          <ConfigField label="Max output">
+            <input type="range" min={64} max={1024} step={32} value={aiSettings.maxOutputTokens}
+              onChange={e => dispatch({ type: 'UPDATE_AI_SETTINGS', payload: { maxOutputTokens: parseInt(e.target.value) } })}
+              style={{ flex: 1, accentColor: '#666' }} />
+            <span style={{ fontSize: 10, color: '#555', width: 36, textAlign: 'right' }}>{aiSettings.maxOutputTokens}</span>
           </ConfigField>
           <ConfigField label="Internet">
             <div onClick={() => dispatch({ type: 'UPDATE_AI_SETTINGS', payload: { internetAccess: !aiSettings.internetAccess } })}
@@ -351,7 +454,7 @@ export function AIChat() {
       )}
 
       {/* Messages */}
-      <div style={{ flex: 1, overflowY: 'auto', padding: '10px 14px' }} className="flint-scrollbar">
+      <div ref={messagesContainerRef} onScroll={handleMessagesScroll} style={{ flex: 1, overflowY: 'auto', padding: '10px 14px', overscrollBehavior: 'contain' }} className="flint-scrollbar">
         {aiMessages.length === 0 && !isStreaming && (
           <div style={{ textAlign: 'center', padding: '24px 10px' }}>
             <div style={{

@@ -148,10 +148,19 @@ export function Sidebar() {
 }
 
 function NoteItem({ note, active, indented, onClick, onContext }: { note: { id: string; title: string }; active: boolean; indented?: boolean; onClick: () => void; onContext: (e: React.MouseEvent) => void; }) {
+  const handleDragStart = (e: React.DragEvent<HTMLDivElement>) => {
+    e.dataTransfer.setData('text/flint-note-id', note.id);
+    e.dataTransfer.setData('text/flint-note-title', note.title);
+    e.dataTransfer.setData('text/plain', `[[${note.title}]]`);
+    e.dataTransfer.effectAllowed = 'copy';
+  };
+
   return (
     <div className="flex items-center gap-2 cursor-pointer"
+      draggable
       style={{ padding: '4px 12px', paddingLeft: indented ? 28 : 12, background: active ? '#141414' : 'transparent', borderLeft: active ? '2px solid #666' : '2px solid transparent', transition: 'all 0.08s' }}
       onClick={onClick}
+      onDragStart={handleDragStart}
       onContextMenu={onContext}
       onMouseEnter={e => { if (!active) e.currentTarget.style.background = '#0f0f0f'; }}
       onMouseLeave={e => { if (!active) e.currentTarget.style.background = 'transparent'; }}>

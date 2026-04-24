@@ -17,6 +17,32 @@
   --accent: #aaa;
   --accent-hover: #bbb;
   --accent-dim: #777;
+  --app-theme-filter: none;
+}
+
+body[data-theme='graphite'] {
+  --app-theme-filter: none;
+}
+
+body[data-theme='ocean'] {
+  --accent: #8fb7d1;
+  --accent-hover: #b5d2e4;
+  --accent-dim: #65859a;
+  --app-theme-filter: hue-rotate(26deg) saturate(1.1);
+}
+
+body[data-theme='forest'] {
+  --accent: #9ac18d;
+  --accent-hover: #bddaad;
+  --accent-dim: #6d8f63;
+  --app-theme-filter: hue-rotate(-34deg) saturate(1.08);
+}
+
+body[data-theme='sunset'] {
+  --accent: #d2a27f;
+  --accent-hover: #e2b999;
+  --accent-dim: #9f775b;
+  --app-theme-filter: hue-rotate(58deg) saturate(1.14);
 }
 
 * { margin: 0; padding: 0; box-sizing: border-box; }
@@ -29,6 +55,11 @@ html, body, #root {
   background: var(--bg-base);
   color: var(--text);
   -webkit-font-smoothing: antialiased;
+}
+
+#root {
+  filter: var(--app-theme-filter);
+  transition: filter 0.2s ease;
 }
 
 ::-webkit-scrollbar { width: 5px; height: 5px; }

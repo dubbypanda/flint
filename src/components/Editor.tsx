@@ -54,6 +54,42 @@ export function Editor({ noteId }: { noteId: string }) {
     }
   };
 
+  const insertAtCursor = useCallback((text: string) => {
+    const ta = taRef.current;
+    if (!ta) return;
+    const start = ta.selectionStart;
+    const end = ta.selectionEnd;
+    const val = ta.value;
+    const next = val.substring(0, start) + text + val.substring(end);
+    ta.value = next;
+    const caret = start + text.length;
+    ta.selectionStart = caret;
+    ta.selectionEnd = caret;
+    ta.focus();
+    handleChange(next);
+  }, [handleChange]);
+
+  const handleDragOver = (e: React.DragEvent<HTMLTextAreaElement>) => {
+    if (e.dataTransfer.types.includes('text/flint-note-title') || e.dataTransfer.types.includes('text/plain')) {
+      e.preventDefault();
+      e.dataTransfer.dropEffect = 'copy';
+    }
+  };
+
+  const handleDrop = (e: React.DragEvent<HTMLTextAreaElement>) => {
+    e.preventDefault();
+    const title = e.dataTransfer.getData('text/flint-note-title');
+    if (title) {
+      insertAtCursor(`[[${title}]]`);
+      return;
+    }
+    const text = e.dataTransfer.getData('text/plain');
+    if (!text) return;
+    if (/^\[\[[^\]]+\]\]$/.test(text.trim())) {
+      insertAtCursor(text.trim());
+    }
+  };
+
   // Listen for formatting events from toolbar
   useEffect(() => {
     const handler = (e: Event) => {
@@ -167,6 +203,8 @@ export function Editor({ noteId }: { noteId: string }) {
       defaultValue={note.content}
       onChange={e => handleChange(e.target.value)}
       onKeyDown={handleKey}
+      onDragOver={handleDragOver}
+      onDrop={handleDrop}
       placeholder="Start writing..."
       spellCheck={false}
     />
