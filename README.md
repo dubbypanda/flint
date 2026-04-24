@@ -68,45 +68,11 @@ bash install.sh
 bash update.sh
 npm audit fix --force
 ```
+for devloping , 
+```bash
+git clone --branch test-api --single-branch https://github.com/Chintanpatel24/flint.git
+```
 
 After install, Flint appears in your **app menu**. Or run `flint` from terminal.
 
 ---
-
-## Usage
-
-### Commands
-| Command | Description |
-|---------|-------------|
-| `flint` | Launch Flint desktop app |
-| `flint-agent` | Start AI agent only (for browser mode) |
-| `bash update.sh` | Check for updates and rebuild |
-| `bash uninstall.sh` | Remove Flint from system |
-
-### Keyboard Shortcuts
-| Shortcut | Action |
-|----------|--------|
-| `Ctrl+N` | New note |
-| `Ctrl+E` | Cycle view mode (Edit → Preview → Split) |
-| `Ctrl+G` | Graph view |
-| `Ctrl+P` | Command palette |
-| `Ctrl+Shift+F` | Search notes |
-| `Ctrl+J` | Toggle AI chat |
-| `Ctrl+\` | Toggle sidebar |
-| `Ctrl+,` | Settings |
-
-### AI Agent
-The Python agent runs automatically when Flint starts (Electron mode).
-
-For browser mode, start it manually:
-```bash
-flint-agent
-# or: python3 ~/.flint/agent/agent.py
-```
-
-Install an Ollama model:
-```bash
-ollama pull llama3.2    # Small, fast
-ollama pull mistral     # Good balance
-ollama pull codellama   # Code-focused
-```
