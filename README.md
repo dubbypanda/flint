@@ -20,7 +20,8 @@ https://github.com/user-attachments/assets/94fa53f9-b3b6-4df8-9038-3f763aec54d4
 
 https://github.com/user-attachments/assets/eab43b70-609a-4373-8f2c-8afc854dece9
 > [!IMPORTANT]  
-> - This version is for the production, but somehow it's not installed as a default, so check your installed filnt with this video's font GUI. 
+> - This version is for the production, but somehow it's not installed as a default, so check your installed filnt with this video's font GUI.
+
 ---
 
 ##  Installation
@@ -31,6 +32,8 @@ git clone https://github.com/Chintanpatel24/flint.git
 cd flint
 bash install.sh
 ```
+> [!IMPORTANT]  
+> - Make sure that you installed all the required libraries like Flask, requests, and llama-cpp so that the agent can work, and launch it from the terminal for the agent to start and use, and launch it from the app menu if you only want a GUI for the non-taking. 
 
 ### For errors @
 ```bash
