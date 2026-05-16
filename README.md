@@ -92,3 +92,4 @@ git clone --branch <branch name> --single-branch https://github.com/Chintanpatel
 
 > [!IMPORTANT]  
 >Please inform me by creating an issue regarding your installation. After an installation, it makes your desktop slow, or it works fine, because after some changes it's not working as functionally and fastly as last. 
+>I think it happens only after some time after an installation; after some time it works fine and without making the desktop slow.
