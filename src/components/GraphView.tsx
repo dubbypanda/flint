@@ -18,6 +18,8 @@ interface GEdge {
   to: string;
 }
 
+type LayoutMode = 'force' | 'ring';
+
 function getSettingsKey(vaultId: string | null) {
   return `flint-graph-settings-${vaultId || 'default'}`;
 }
@@ -64,28 +66,28 @@ export function GraphView() {
   const animRef = useRef(0);
   const hoverRef = useRef<string | null>(null);
   const sizeRef = useRef({ w: 0, h: 0 });
+  const layoutModeRef = useRef<LayoutMode>('force');
 
   const [query, setQuery] = useState('');
   const [stats, setStats] = useState({ nodes: 0, edges: 0 });
   const [zoom, setZoom] = useState(1);
   const [settingsOpen, setSettingsOpen] = useState(false);
+  const [layoutMode, setLayoutMode] = useState<LayoutMode>('force');
 
-  // User customizable settings
   const saved = useMemo(() => loadSettings(state.activeVaultId), [state.activeVaultId]);
-  const [nodeColor, setNodeColor] = useState(saved?.nodeColor || '#b0b8c8');
-  const [activeNodeColor, setActiveNodeColor] = useState(saved?.activeNodeColor || '#ffffff');
-  const [lineColor, setLineColor] = useState(saved?.lineColor || '#5a6478');
-  const [activeLineColor, setActiveLineColor] = useState(saved?.activeLineColor || '#8899aa');
+  const [nodeColor, setNodeColor] = useState(saved?.nodeColor || '#7c6f9f');
+  const [activeNodeColor, setActiveNodeColor] = useState(saved?.activeNodeColor || '#a78bfa');
+  const [lineColor, setLineColor] = useState(saved?.lineColor || '#4a4460');
+  const [activeLineColor, setActiveLineColor] = useState(saved?.activeLineColor || '#7c6f9f');
   const [nodeBaseSize, setNodeBaseSize] = useState<number>(saved?.nodeBaseSize ?? 4);
   const [connBoost, setConnBoost] = useState<number>(saved?.connBoost ?? 1.2);
-  const [lineWidth, setLineWidth] = useState<number>(saved?.lineWidth ?? 1.2);
+  const [lineWidth, setLineWidth] = useState<number>(saved?.lineWidth ?? 1);
   const [activeLineWidth, setActiveLineWidth] = useState<number>(saved?.activeLineWidth ?? 2.0);
-  const [lineOpacity, setLineOpacity] = useState<number>(saved?.lineOpacity ?? 0.6);
+  const [lineOpacity, setLineOpacity] = useState<number>(saved?.lineOpacity ?? 0.5);
   const [lineDash, setLineDash] = useState<'solid' | 'dashed' | 'dotted'>(saved?.lineDash || 'solid');
   const [showAllLabels, setShowAllLabels] = useState<boolean>(saved?.showAllLabels ?? false);
   const [radialSpread, setRadialSpread] = useState<number>(saved?.radialSpread ?? 220);
 
-  // Persist settings
   useEffect(() => {
     saveSettings(state.activeVaultId, {
       nodeColor, activeNodeColor, lineColor, activeLineColor,
@@ -96,7 +98,6 @@ export function GraphView() {
       nodeBaseSize, connBoost, lineWidth, activeLineWidth,
       lineOpacity, lineDash, showAllLabels, radialSpread, state.activeVaultId]);
 
-  // Settings ref for render loop
   const settingsRef = useRef({
     nodeColor, activeNodeColor, lineColor, activeLineColor,
     nodeBaseSize, connBoost, lineWidth, activeLineWidth,
@@ -113,7 +114,10 @@ export function GraphView() {
       nodeBaseSize, connBoost, lineWidth, activeLineWidth,
       lineOpacity, lineDash, showAllLabels, radialSpread]);
 
-  // Build graph with circular layout
+  useEffect(() => {
+    layoutModeRef.current = layoutMode;
+  }, [layoutMode]);
+
   const buildGraph = useCallback(() => {
     const links: Record<string, Set<string>> = {};
     const titleMap = new Map(state.notes.map(n => [n.title.toLowerCase(), n.id]));
@@ -134,18 +138,16 @@ export function GraphView() {
     const cy = sizeRef.current.h / 2 || 400;
     const spread = settingsRef.current.radialSpread;
 
-    // Sort by connections for concentric rings
     const sorted = state.notes
       .map(n => ({ note: n, conns: links[n.id]?.size || 0 }))
       .sort((a, b) => b.conns - a.conns);
 
-    // Place in concentric circles: most connected at center
     const existing = new Map(nodesRef.current.map(n => [n.id, { x: n.x, y: n.y }]));
 
     nodesRef.current = sorted.map(({ note, conns }, index) => {
       const old = existing.get(note.id);
 
-      // Ring assignment
+      // Ring layout positions
       let ring: number;
       if (conns >= 5) ring = 0;
       else if (conns >= 3) ring = 1;
@@ -177,11 +179,15 @@ export function GraphView() {
       const targetX = cx + Math.cos(angle) * radius;
       const targetY = cy + Math.sin(angle) * radius;
 
+      // Force-directed: scatter from center with jitter
+      const forceX = cx + (Math.random() - 0.5) * spread * 1.5;
+      const forceY = cy + (Math.random() - 0.5) * spread * 1.5;
+
       return {
         id: note.id,
         title: note.title,
-        x: old?.x ?? targetX + (Math.random() - 0.5) * 20,
-        y: old?.y ?? targetY + (Math.random() - 0.5) * 20,
+        x: old?.x ?? (layoutModeRef.current === 'ring' ? targetX : forceX),
+        y: old?.y ?? (layoutModeRef.current === 'ring' ? targetY : forceY),
         vx: 0,
         vy: 0,
         conns,
@@ -207,7 +213,40 @@ export function GraphView() {
     setStats({ nodes: nodesRef.current.length, edges: edgesRef.current.length });
   }, [state.notes]);
 
-  // Canvas sizing
+  // Snap to ring positions
+  const applyRingLayout = useCallback(() => {
+    const cx = sizeRef.current.w / 2 || 500;
+    const cy = sizeRef.current.h / 2 || 400;
+    const spread = settingsRef.current.radialSpread;
+    const sorted = [...nodesRef.current].sort((a, b) => b.conns - a.conns);
+
+    nodesRef.current.forEach(node => {
+      const sortedIdx = sorted.findIndex(n => n.id === node.id);
+      const conns = node.conns;
+      let ring: number;
+      if (conns >= 5) ring = 0;
+      else if (conns >= 3) ring = 1;
+      else if (conns >= 1) ring = 2;
+      else ring = 3;
+
+      const nodesInRing = sorted.filter(n => {
+        const c = n.conns;
+        if (ring === 0) return c >= 5;
+        if (ring === 1) return c >= 3 && c < 5;
+        if (ring === 2) return c >= 1 && c < 3;
+        return c === 0;
+      });
+
+      const indexInRing = nodesInRing.findIndex(n => n.id === node.id);
+      const countInRing = nodesInRing.length;
+      const radius = ring === 0 ? spread * 0.3 : ring === 1 ? spread * 0.65 : ring === 2 ? spread * 1.0 : spread * 1.4;
+      const angle = countInRing > 0 ? (indexInRing / countInRing) * Math.PI * 2 - Math.PI / 2 : 0;
+
+      node.vx += (cx + Math.cos(angle) * radius - node.x) * 0.04;
+      node.vy += (cy + Math.sin(angle) * radius - node.y) * 0.04;
+    });
+  }, []);
+
   useEffect(() => {
     const canvas = canvasRef.current;
     if (!canvas) return;
@@ -224,7 +263,6 @@ export function GraphView() {
 
   useEffect(() => { buildGraph(); }, [buildGraph]);
 
-  // Render loop
   useEffect(() => {
     const canvas = canvasRef.current;
     if (!canvas) return;
@@ -232,58 +270,70 @@ export function GraphView() {
     let running = true;
     const dark = isDarkTheme();
 
+    // Obsidian dark palette
+    const BG = '#0d0d0d';
+    const GRID_DOT = 'rgba(255,255,255,0.035)';
+
     const getNode = (id: string) => nodesRef.current.find(n => n.id === id);
 
     const simulate = () => {
       const nodes = nodesRef.current;
       const edges = edgesRef.current;
-      const cx = sizeRef.current.w / 2;
-      const cy = sizeRef.current.h / 2;
+      const mode = layoutModeRef.current;
 
-      // Repulsion
-      for (let i = 0; i < nodes.length; i++) {
-        for (let j = i + 1; j < nodes.length; j++) {
-          const dx = nodes[j].x - nodes[i].x;
-          const dy = nodes[j].y - nodes[i].y;
+      if (mode === 'force') {
+        const cx = sizeRef.current.w / 2;
+        const cy = sizeRef.current.h / 2;
+
+        // Repulsion between all nodes
+        for (let i = 0; i < nodes.length; i++) {
+          for (let j = i + 1; j < nodes.length; j++) {
+            const dx = nodes[j].x - nodes[i].x;
+            const dy = nodes[j].y - nodes[i].y;
+            const dist = Math.max(Math.sqrt(dx * dx + dy * dy), 1);
+            const force = 2800 / (dist * dist);
+            const fx = (dx / dist) * force;
+            const fy = (dy / dist) * force;
+            nodes[i].vx -= fx;
+            nodes[i].vy -= fy;
+            nodes[j].vx += fx;
+            nodes[j].vy += fy;
+          }
+        }
+
+        // Spring attraction along edges
+        for (const e of edges) {
+          const a = getNode(e.from);
+          const b = getNode(e.to);
+          if (!a || !b) continue;
+          const dx = b.x - a.x;
+          const dy = b.y - a.y;
           const dist = Math.max(Math.sqrt(dx * dx + dy * dy), 1);
-          const force = 2200 / (dist * dist);
+          const naturalLen = 90 + (a.conns + b.conns) * 6;
+          const force = (dist - naturalLen) * 0.006;
           const fx = (dx / dist) * force;
           const fy = (dy / dist) * force;
-          nodes[i].vx -= fx;
-          nodes[i].vy -= fy;
-          nodes[j].vx += fx;
-          nodes[j].vy += fy;
+          a.vx += fx; a.vy += fy;
+          b.vx -= fx; b.vy -= fy;
         }
+
+        // Gravity toward center
+        for (const n of nodes) {
+          n.vx += (cx - n.x) * 0.00025;
+          n.vy += (cy - n.y) * 0.00025;
+        }
+      } else {
+        // Ring layout — pull toward ring positions
+        applyRingLayout();
       }
 
-      // Springs
-      for (const e of edges) {
-        const a = getNode(e.from);
-        const b = getNode(e.to);
-        if (!a || !b) continue;
-        const dx = b.x - a.x;
-        const dy = b.y - a.y;
-        const dist = Math.max(Math.sqrt(dx * dx + dy * dy), 1);
-        const force = (dist - 100) * 0.004;
-        const fx = (dx / dist) * force;
-        const fy = (dy / dist) * force;
-        a.vx += fx; a.vy += fy;
-        b.vx -= fx; b.vy -= fy;
-      }
-
-      // Center
-      for (const n of nodes) {
-        n.vx += (cx - n.x) * 0.0002;
-        n.vy += (cy - n.y) * 0.0002;
-      }
-
-      // Apply
+      // Apply velocity with damping
       for (const n of nodes) {
         if (n.id === dragRef.current) { n.vx = 0; n.vy = 0; continue; }
-        n.vx *= 0.88;
-        n.vy *= 0.88;
+        n.vx *= 0.85;
+        n.vy *= 0.85;
         const speed = Math.sqrt(n.vx * n.vx + n.vy * n.vy);
-        if (speed > 6) { n.vx = (n.vx / speed) * 6; n.vy = (n.vy / speed) * 6; }
+        if (speed > 8) { n.vx = (n.vx / speed) * 8; n.vy = (n.vy / speed) * 8; }
         n.x += n.vx;
         n.y += n.vy;
       }
@@ -311,48 +361,48 @@ export function GraphView() {
       const s = settingsRef.current;
       const q = query.toLowerCase();
 
-      // Background
-      ctx.fillStyle = dark ? '#1e1e1e' : '#f5f5f5';
+      // Obsidian-style deep dark background
+      ctx.fillStyle = BG;
       ctx.fillRect(0, 0, w, h);
 
-      // Dot grid
-      const dotColor = dark ? 'rgba(255,255,255,0.04)' : 'rgba(0,0,0,0.06)';
-      ctx.fillStyle = dotColor;
-      const gs = 40 * z;
-      if (gs > 8) {
+      // Fine dot grid
+      ctx.fillStyle = GRID_DOT;
+      const gs = 28 * z;
+      if (gs > 6) {
         const ox = ((p.x % gs) + gs) % gs;
         const oy = ((p.y % gs) + gs) % gs;
         for (let x = ox; x < w; x += gs) {
           for (let y = oy; y < h; y += gs) {
             ctx.beginPath();
-            ctx.arc(x, y, 1, 0, Math.PI * 2);
+            ctx.arc(x, y, 0.8, 0, Math.PI * 2);
             ctx.fill();
           }
         }
       }
 
-      // Concentric ring guides
       ctx.save();
       ctx.translate(p.x, p.y);
       ctx.scale(z, z);
 
       const cx = sizeRef.current.w / 2;
       const cy = sizeRef.current.h / 2;
-      const ringColor = dark ? 'rgba(255,255,255,0.03)' : 'rgba(0,0,0,0.04)';
-      ctx.strokeStyle = ringColor;
-      ctx.lineWidth = 1;
-      ctx.setLineDash([4, 6]);
-      for (let i = 1; i <= 4; i++) {
-        const r = s.radialSpread * (i * 0.35);
-        ctx.beginPath();
-        ctx.arc(cx, cy, r, 0, Math.PI * 2);
-        ctx.stroke();
+
+      // Ring guides (only in ring mode, or subtly in force)
+      if (layoutModeRef.current === 'ring') {
+        ctx.strokeStyle = 'rgba(255,255,255,0.03)';
+        ctx.lineWidth = 1 / z;
+        ctx.setLineDash([3, 8]);
+        for (let i = 1; i <= 4; i++) {
+          const r = s.radialSpread * (i * 0.35);
+          ctx.beginPath();
+          ctx.arc(cx, cy, r, 0, Math.PI * 2);
+          ctx.stroke();
+        }
+        ctx.setLineDash([]);
       }
-      ctx.setLineDash([]);
 
       const isMatch = (n: GNode) => !q || n.title.toLowerCase().includes(q);
 
-      // Get connected node IDs for hover/active
       const getConnectedIds = (nodeId: string): Set<string> => {
         const ids = new Set<string>();
         edges.forEach(e => {
@@ -365,35 +415,37 @@ export function GraphView() {
       const hoverConnected = hoverRef.current ? getConnectedIds(hoverRef.current) : new Set<string>();
       const activeConnected = activeId ? getConnectedIds(activeId) : new Set<string>();
 
-      // Line dash pattern
       const getDash = (): number[] => {
         if (s.lineDash === 'dashed') return [6, 4];
         if (s.lineDash === 'dotted') return [2, 3];
         return [];
       };
 
-      // Edges
+      // Draw edges with smooth curves
       for (const e of edges) {
         const a = getNode(e.from);
         const b = getNode(e.to);
         if (!a || !b) continue;
         if (q && !isMatch(a) && !isMatch(b)) continue;
 
-        const isActive = activeId === e.from || activeId === e.to;
-        const isHover = hoverRef.current === e.from || hoverRef.current === e.to;
-        const highlight = isActive || isHover;
+        const isActiveEdge = activeId === e.from || activeId === e.to;
+        const isHoverEdge = hoverRef.current === e.from || hoverRef.current === e.to;
+        const highlight = isActiveEdge || isHoverEdge;
 
         ctx.beginPath();
+        // Slightly curved lines for Obsidian feel
+        const mx = (a.x + b.x) / 2;
+        const my = (a.y + b.y) / 2;
         ctx.moveTo(a.x, a.y);
         ctx.lineTo(b.x, b.y);
 
         if (highlight) {
           ctx.strokeStyle = hexToRgba(s.activeLineColor, 0.9);
-          ctx.lineWidth = s.activeLineWidth;
+          ctx.lineWidth = s.activeLineWidth / z;
           ctx.setLineDash([]);
         } else {
           ctx.strokeStyle = hexToRgba(s.lineColor, s.lineOpacity);
-          ctx.lineWidth = s.lineWidth;
+          ctx.lineWidth = s.lineWidth / z;
           ctx.setLineDash(getDash());
         }
 
@@ -411,16 +463,16 @@ export function GraphView() {
         const isConnectedToHover = hoverConnected.has(n.id);
         const isConnectedToActive = activeConnected.has(n.id);
 
-        // Size: base + small boost for connections
-        const boost = Math.min(n.conns * s.connBoost, s.nodeBaseSize * 1.5);
+        const boost = Math.min(n.conns * s.connBoost, s.nodeBaseSize * 2);
         const radius = s.nodeBaseSize + boost;
 
-        // Glow for active/hover
+        // Obsidian-style outer glow
         if (isActive || isHover) {
-          const glowRadius = radius * 3;
-          const glow = ctx.createRadialGradient(n.x, n.y, radius, n.x, n.y, glowRadius);
+          const glowRadius = radius * 4;
+          const glow = ctx.createRadialGradient(n.x, n.y, 0, n.x, n.y, glowRadius);
           const glowColor = isActive ? s.activeNodeColor : s.nodeColor;
-          glow.addColorStop(0, hexToRgba(glowColor, 0.2));
+          glow.addColorStop(0, hexToRgba(glowColor, isActive ? 0.35 : 0.2));
+          glow.addColorStop(0.4, hexToRgba(glowColor, isActive ? 0.12 : 0.07));
           glow.addColorStop(1, hexToRgba(glowColor, 0));
           ctx.beginPath();
           ctx.arc(n.x, n.y, glowRadius, 0, Math.PI * 2);
@@ -428,53 +480,68 @@ export function GraphView() {
           ctx.fill();
         }
 
+        // Connected-to-active: subtle highlight ring
+        if (isConnectedToActive && !isActive) {
+          ctx.beginPath();
+          ctx.arc(n.x, n.y, radius + 2.5 / z, 0, Math.PI * 2);
+          ctx.strokeStyle = hexToRgba(s.activeNodeColor, 0.3);
+          ctx.lineWidth = 1 / z;
+          ctx.stroke();
+        }
+
         // Node circle
         ctx.beginPath();
         ctx.arc(n.x, n.y, radius, 0, Math.PI * 2);
 
         if (isActive) {
-          ctx.fillStyle = s.activeNodeColor;
-        } else if (isHover || isConnectedToHover || isConnectedToActive) {
-          ctx.fillStyle = hexToRgba(s.nodeColor, 1);
+          // Obsidian active: bright with inner gradient
+          const grad = ctx.createRadialGradient(n.x - radius * 0.3, n.y - radius * 0.3, 0, n.x, n.y, radius);
+          grad.addColorStop(0, hexToRgba(s.activeNodeColor, 1));
+          grad.addColorStop(1, hexToRgba(s.activeNodeColor, 0.75));
+          ctx.fillStyle = grad;
+        } else if (isHover) {
+          ctx.fillStyle = hexToRgba(s.nodeColor, 0.95);
+        } else if (isConnectedToHover || isConnectedToActive) {
+          ctx.fillStyle = hexToRgba(s.nodeColor, 0.85);
         } else if (n.conns === 0) {
-          ctx.fillStyle = hexToRgba(s.nodeColor, 0.35);
+          ctx.fillStyle = hexToRgba(s.nodeColor, 0.28);
         } else {
-          ctx.fillStyle = hexToRgba(s.nodeColor, 0.7);
+          ctx.fillStyle = hexToRgba(s.nodeColor, 0.65);
         }
         ctx.fill();
 
-        // Border
+        // Stroke ring
         if (isActive) {
-          ctx.strokeStyle = s.activeNodeColor;
-          ctx.lineWidth = 2;
+          ctx.strokeStyle = hexToRgba(s.activeNodeColor, 0.9);
+          ctx.lineWidth = 1.5 / z;
           ctx.stroke();
         } else if (isHover) {
-          ctx.strokeStyle = hexToRgba(s.nodeColor, 0.8);
-          ctx.lineWidth = 1.5;
+          ctx.strokeStyle = hexToRgba(s.nodeColor, 0.7);
+          ctx.lineWidth = 1 / z;
           ctx.stroke();
         }
 
-        // Label
-        const showLabel = s.showAllLabels || isActive || isHover || isConnectedToHover;
+        // Label rendering — Obsidian style
+        const showLabel = s.showAllLabels || isActive || isHover || isConnectedToHover || isConnectedToActive;
         if (showLabel) {
-          const fontSize = isActive ? 12 : isHover ? 11 : 10;
-          ctx.font = `${isActive ? '600' : '400'} ${fontSize}px -apple-system, BlinkMacSystemFont, "Segoe UI", sans-serif`;
+          const fontSize = (isActive ? 12 : isHover ? 11 : 10) / z;
+          ctx.font = `${isActive ? '500' : '400'} ${fontSize}px -apple-system, BlinkMacSystemFont, "Segoe UI", sans-serif`;
           ctx.textAlign = 'center';
 
-          const text = n.title;
+          const text = n.title.length > 28 ? n.title.slice(0, 26) + '…' : n.title;
           const tw = ctx.measureText(text).width;
           const tx = n.x;
-          const ty = n.y + radius + 15;
-          const padH = 5;
-          const padV = 3;
+          const ty = n.y + radius + (14 / z);
+          const padH = 5 / z;
+          const padV = 3 / z;
 
-          // Label bg
-          ctx.fillStyle = dark ? 'rgba(0,0,0,0.65)' : 'rgba(255,255,255,0.8)';
+          // Pill background
+          ctx.fillStyle = 'rgba(13,13,13,0.78)';
           const bx = tx - tw / 2 - padH;
           const by = ty - fontSize;
           const bw = tw + padH * 2;
           const bh = fontSize + padV * 2;
-          const br = 3;
+          const br = 3 / z;
           ctx.beginPath();
           ctx.moveTo(bx + br, by);
           ctx.lineTo(bx + bw - br, by);
@@ -488,10 +555,11 @@ export function GraphView() {
           ctx.closePath();
           ctx.fill();
 
-          // Text
           ctx.fillStyle = isActive
-            ? (dark ? '#ffffff' : '#000000')
-            : (dark ? 'rgba(255,255,255,0.75)' : 'rgba(0,0,0,0.7)');
+            ? hexToRgba(s.activeNodeColor, 0.95)
+            : isHover
+            ? 'rgba(255,255,255,0.82)'
+            : 'rgba(255,255,255,0.55)';
           ctx.fillText(text, tx, ty);
         }
       }
@@ -502,7 +570,7 @@ export function GraphView() {
 
     animRef.current = requestAnimationFrame(draw);
     return () => { running = false; cancelAnimationFrame(animRef.current); };
-  }, [state.activeNoteId, state.notes, query]);
+  }, [state.activeNoteId, state.notes, query, layoutMode, applyRingLayout]);
 
   const getNodeAt = useCallback((mx: number, my: number) => {
     const z = zoomRef.current;
@@ -511,7 +579,7 @@ export function GraphView() {
     const wy = (my - p.y) / z;
     const s = settingsRef.current;
     for (const n of [...nodesRef.current].reverse()) {
-      const boost = Math.min(n.conns * s.connBoost, s.nodeBaseSize * 1.5);
+      const boost = Math.min(n.conns * s.connBoost, s.nodeBaseSize * 2);
       const r = s.nodeBaseSize + boost + 6;
       if ((wx - n.x) ** 2 + (wy - n.y) ** 2 < r * r) return n;
     }
@@ -617,15 +685,26 @@ export function GraphView() {
   };
 
   const dark = isDarkTheme();
-  const borderColor = dark ? 'rgba(255,255,255,0.08)' : 'rgba(0,0,0,0.1)';
-  const panelBg = dark ? 'rgba(28,28,28,0.94)' : 'rgba(250,250,250,0.95)';
-  const textMain = dark ? 'rgba(255,255,255,0.85)' : 'rgba(0,0,0,0.85)';
-  const textDim = dark ? 'rgba(255,255,255,0.4)' : 'rgba(0,0,0,0.4)';
-  const textSub = dark ? 'rgba(255,255,255,0.6)' : 'rgba(0,0,0,0.6)';
-  const inputBg = dark ? 'rgba(255,255,255,0.05)' : 'rgba(0,0,0,0.04)';
+  const borderColor = 'rgba(255,255,255,0.07)';
+  const panelBg = 'rgba(18,18,18,0.96)';
+  const textMain = 'rgba(255,255,255,0.82)';
+  const textDim = 'rgba(255,255,255,0.35)';
+  const textSub = 'rgba(255,255,255,0.55)';
+  const inputBg = 'rgba(255,255,255,0.04)';
+  const accentPurple = '#7c6f9f';
+
+  const btnBase: React.CSSProperties = {
+    width: 32, height: 32, background: 'none', border: 'none',
+    color: textDim, cursor: 'pointer', borderRadius: 5,
+    display: 'flex', alignItems: 'center', justifyContent: 'center',
+    transition: 'all 0.12s',
+  };
 
   return (
-    <div className="fixed inset-0 animate-fade-in" style={{ zIndex: 110, background: dark ? '#1e1e1e' : '#f5f5f5' }}>
+    <div
+      className="fixed inset-0 animate-fade-in"
+      style={{ zIndex: 110, background: '#0d0d0d' }}
+    >
       <canvas
         ref={canvasRef}
         onMouseDown={handleMouseDown}
@@ -642,15 +721,18 @@ export function GraphView() {
         className="flex items-center justify-between"
         style={{
           position: 'absolute', top: 0, left: 0, right: 0,
-          padding: '10px 16px',
+          padding: '9px 14px',
           background: panelBg,
           borderBottom: `1px solid ${borderColor}`,
-          backdropFilter: 'blur(10px)',
+          backdropFilter: 'blur(14px)',
+          zIndex: 10,
         }}
       >
         <div className="flex items-center gap-3">
           <FlintLogo size={14} />
-          <span style={{ fontSize: 12, fontWeight: 600, color: textSub }}>Graph View</span>
+          <span style={{ fontSize: 12, fontWeight: 600, color: textSub, letterSpacing: 0.2 }}>
+            Graph View
+          </span>
           <span style={{
             fontSize: 10, color: textDim,
             background: inputBg,
@@ -659,91 +741,131 @@ export function GraphView() {
           }}>
             {stats.nodes} nodes · {stats.edges} links
           </span>
+
+          {/* Layout toggle */}
+          <div style={{
+            display: 'flex',
+            background: inputBg,
+            border: `1px solid ${borderColor}`,
+            borderRadius: 6,
+            padding: 2,
+            gap: 2,
+          }}>
+            {(['force', 'ring'] as LayoutMode[]).map(mode => (
+              <button
+                key={mode}
+                onClick={() => setLayoutMode(mode)}
+                style={{
+                  padding: '3px 10px',
+                  borderRadius: 4,
+                  border: 'none',
+                  fontSize: 10,
+                  fontWeight: 500,
+                  cursor: 'pointer',
+                  background: layoutMode === mode ? accentPurple : 'none',
+                  color: layoutMode === mode ? '#fff' : textDim,
+                  transition: 'all 0.15s',
+                }}
+              >
+                {mode === 'force' ? 'Force' : 'Ring'}
+              </button>
+            ))}
+          </div>
         </div>
 
         <div className="flex items-center gap-3">
           <div className="flex items-center gap-2" style={{
-            padding: '6px 10px', background: inputBg,
+            padding: '5px 10px', background: inputBg,
             border: `1px solid ${borderColor}`, borderRadius: 6,
           }}>
-            <Search size={12} style={{ color: textDim }} />
+            <Search size={11} style={{ color: textDim }} />
             <input
               value={query} onChange={e => setQuery(e.target.value)}
               placeholder="Filter nodes..."
-              style={{ background: 'none', border: 'none', outline: 'none', color: textMain, fontSize: 12, width: 130 }}
+              style={{
+                background: 'none', border: 'none', outline: 'none',
+                color: textMain, fontSize: 12, width: 130,
+                fontFamily: 'inherit',
+              }}
             />
             {query && (
               <button onClick={() => setQuery('')}
                 style={{ background: 'none', border: 'none', color: textDim, cursor: 'pointer', display: 'flex', padding: 0 }}>
-                <X size={12} />
+                <X size={11} />
               </button>
             )}
           </div>
 
-          <span style={{ fontSize: 10, color: textDim, minWidth: 38, textAlign: 'center', fontVariantNumeric: 'tabular-nums' }}>
+          <span style={{
+            fontSize: 10, color: textDim, minWidth: 38,
+            textAlign: 'center', fontVariantNumeric: 'tabular-nums',
+          }}>
             {Math.round(zoom * 100)}%
           </span>
 
-          <button onClick={() => dispatch({ type: 'TOGGLE_GRAPH_VIEW' })}
-            style={{ background: 'none', border: 'none', color: textDim, cursor: 'pointer', display: 'flex', padding: 4 }}
-            onMouseEnter={e => { e.currentTarget.style.color = textMain; }}
-            onMouseLeave={e => { e.currentTarget.style.color = textDim; }}>
-            <X size={18} />
+          <button
+            onClick={() => dispatch({ type: 'TOGGLE_GRAPH_VIEW' })}
+            style={{ background: 'none', border: 'none', color: textDim, cursor: 'pointer', display: 'flex', padding: 4, borderRadius: 4 }}
+            onMouseEnter={e => { e.currentTarget.style.color = textMain; e.currentTarget.style.background = inputBg; }}
+            onMouseLeave={e => { e.currentTarget.style.color = textDim; e.currentTarget.style.background = 'none'; }}
+          >
+            <X size={16} />
           </button>
         </div>
       </div>
 
       {/* Settings Panel */}
       <div style={{
-        position: 'absolute', top: 56, right: 12, width: 240,
-        background: panelBg, backdropFilter: 'blur(12px)',
+        position: 'absolute', top: 54, right: 12, width: 236,
+        background: panelBg, backdropFilter: 'blur(14px)',
         border: `1px solid ${borderColor}`, borderRadius: 8,
         overflow: 'hidden',
+        boxShadow: '0 8px 32px rgba(0,0,0,0.5)',
       }}>
-        <button onClick={() => setSettingsOpen(!settingsOpen)}
+        <button
+          onClick={() => setSettingsOpen(!settingsOpen)}
           style={{
             width: '100%', display: 'flex', alignItems: 'center',
-            justifyContent: 'space-between', padding: '10px 12px',
+            justifyContent: 'space-between', padding: '9px 12px',
             background: 'none', border: 'none', color: textMain, cursor: 'pointer',
             borderBottom: settingsOpen ? `1px solid ${borderColor}` : 'none',
-          }}>
+          }}
+        >
           <div style={{ display: 'flex', alignItems: 'center', gap: 6 }}>
-            <Settings size={13} style={{ color: textDim }} />
-            <span style={{ fontSize: 12, fontWeight: 500 }}>Appearance</span>
+            <Settings size={12} style={{ color: textDim }} />
+            <span style={{ fontSize: 11, fontWeight: 500, letterSpacing: 0.2 }}>Appearance</span>
           </div>
-          {settingsOpen ? <ChevronDown size={13} /> : <ChevronRight size={13} />}
+          {settingsOpen ? <ChevronDown size={12} style={{ color: textDim }} /> : <ChevronRight size={12} style={{ color: textDim }} />}
         </button>
 
         {settingsOpen && (
-          <div style={{ padding: '10px 12px', display: 'flex', flexDirection: 'column', gap: 12 }}>
-            {/* Node Colors */}
+          <div style={{ padding: '10px 12px', display: 'flex', flexDirection: 'column', gap: 14, maxHeight: '65vh', overflowY: 'auto' }}>
+
+            {/* Nodes */}
             <div>
-              <div style={{ fontSize: 9, fontWeight: 700, color: textDim, marginBottom: 8, textTransform: 'uppercase', letterSpacing: 0.8 }}>
+              <div style={{ fontSize: 9, fontWeight: 700, color: textDim, marginBottom: 8, textTransform: 'uppercase', letterSpacing: 1 }}>
                 Nodes
               </div>
-              <div style={{ display: 'flex', flexDirection: 'column', gap: 6 }}>
+              <div style={{ display: 'flex', flexDirection: 'column', gap: 7 }}>
+                {[
+                  { label: 'Color', el: <input type="color" value={nodeColor} onChange={e => setNodeColor(e.target.value)} style={{ width: 22, height: 18, border: 'none', borderRadius: 3, padding: 0, cursor: 'pointer', background: 'none' }} /> },
+                  { label: 'Active', el: <input type="color" value={activeNodeColor} onChange={e => setActiveNodeColor(e.target.value)} style={{ width: 22, height: 18, border: 'none', borderRadius: 3, padding: 0, cursor: 'pointer', background: 'none' }} /> },
+                ].map(({ label, el }) => (
+                  <div key={label} style={{ display: 'flex', alignItems: 'center', gap: 8 }}>
+                    <span style={{ fontSize: 11, color: textSub, width: 60 }}>{label}</span>
+                    {el}
+                  </div>
+                ))}
                 <div style={{ display: 'flex', alignItems: 'center', gap: 8 }}>
-                  <span style={{ fontSize: 11, color: textSub, width: 65 }}>Color</span>
-                  <input type="color" value={nodeColor} onChange={e => setNodeColor(e.target.value)}
-                    style={{ width: 24, height: 20, border: 'none', borderRadius: 3, padding: 0, cursor: 'pointer' }} />
-                </div>
-                <div style={{ display: 'flex', alignItems: 'center', gap: 8 }}>
-                  <span style={{ fontSize: 11, color: textSub, width: 65 }}>Active</span>
-                  <input type="color" value={activeNodeColor} onChange={e => setActiveNodeColor(e.target.value)}
-                    style={{ width: 24, height: 20, border: 'none', borderRadius: 3, padding: 0, cursor: 'pointer' }} />
-                </div>
-                <div style={{ display: 'flex', alignItems: 'center', gap: 8 }}>
-                  <span style={{ fontSize: 11, color: textSub, width: 65 }}>Size</span>
+                  <span style={{ fontSize: 11, color: textSub, width: 60 }}>Size</span>
                   <input type="range" min={2} max={10} step={0.5} value={nodeBaseSize}
-                    onChange={e => setNodeBaseSize(parseFloat(e.target.value))}
-                    style={{ flex: 1 }} />
+                    onChange={e => setNodeBaseSize(parseFloat(e.target.value))} style={{ flex: 1, accentColor: accentPurple }} />
                   <span style={{ fontSize: 10, color: textDim, width: 20, textAlign: 'right' }}>{nodeBaseSize}</span>
                 </div>
                 <div style={{ display: 'flex', alignItems: 'center', gap: 8 }}>
-                  <span style={{ fontSize: 11, color: textSub, width: 65 }}>Boost</span>
+                  <span style={{ fontSize: 11, color: textSub, width: 60 }}>Boost</span>
                   <input type="range" min={0} max={3} step={0.2} value={connBoost}
-                    onChange={e => setConnBoost(parseFloat(e.target.value))}
-                    style={{ flex: 1 }} />
+                    onChange={e => setConnBoost(parseFloat(e.target.value))} style={{ flex: 1, accentColor: accentPurple }} />
                   <span style={{ fontSize: 10, color: textDim, width: 20, textAlign: 'right' }}>{connBoost}</span>
                 </div>
               </div>
@@ -751,48 +873,45 @@ export function GraphView() {
 
             {/* Lines */}
             <div>
-              <div style={{ fontSize: 9, fontWeight: 700, color: textDim, marginBottom: 8, textTransform: 'uppercase', letterSpacing: 0.8 }}>
+              <div style={{ fontSize: 9, fontWeight: 700, color: textDim, marginBottom: 8, textTransform: 'uppercase', letterSpacing: 1 }}>
                 Lines
               </div>
-              <div style={{ display: 'flex', flexDirection: 'column', gap: 6 }}>
+              <div style={{ display: 'flex', flexDirection: 'column', gap: 7 }}>
+                {[
+                  { label: 'Color', el: <input type="color" value={lineColor} onChange={e => setLineColor(e.target.value)} style={{ width: 22, height: 18, border: 'none', borderRadius: 3, padding: 0, cursor: 'pointer' }} /> },
+                  { label: 'Active', el: <input type="color" value={activeLineColor} onChange={e => setActiveLineColor(e.target.value)} style={{ width: 22, height: 18, border: 'none', borderRadius: 3, padding: 0, cursor: 'pointer' }} /> },
+                ].map(({ label, el }) => (
+                  <div key={label} style={{ display: 'flex', alignItems: 'center', gap: 8 }}>
+                    <span style={{ fontSize: 11, color: textSub, width: 60 }}>{label}</span>
+                    {el}
+                  </div>
+                ))}
+                {[
+                  { label: 'Width', min: 0.5, max: 4, step: 0.1, value: lineWidth, set: setLineWidth },
+                  { label: 'Highlight', min: 1, max: 5, step: 0.2, value: activeLineWidth, set: setActiveLineWidth },
+                  { label: 'Opacity', min: 0.1, max: 1, step: 0.05, value: lineOpacity, set: setLineOpacity, fmt: (v: number) => v.toFixed(1) },
+                ].map(({ label, min, max, step, value, set, fmt }) => (
+                  <div key={label} style={{ display: 'flex', alignItems: 'center', gap: 8 }}>
+                    <span style={{ fontSize: 11, color: textSub, width: 60 }}>{label}</span>
+                    <input type="range" min={min} max={max} step={step} value={value}
+                      onChange={e => (set as (v: number) => void)(parseFloat(e.target.value))}
+                      style={{ flex: 1, accentColor: accentPurple }} />
+                    <span style={{ fontSize: 10, color: textDim, width: 24, textAlign: 'right' }}>
+                      {fmt ? fmt(value) : value}
+                    </span>
+                  </div>
+                ))}
                 <div style={{ display: 'flex', alignItems: 'center', gap: 8 }}>
-                  <span style={{ fontSize: 11, color: textSub, width: 65 }}>Color</span>
-                  <input type="color" value={lineColor} onChange={e => setLineColor(e.target.value)}
-                    style={{ width: 24, height: 20, border: 'none', borderRadius: 3, padding: 0, cursor: 'pointer' }} />
-                </div>
-                <div style={{ display: 'flex', alignItems: 'center', gap: 8 }}>
-                  <span style={{ fontSize: 11, color: textSub, width: 65 }}>Active</span>
-                  <input type="color" value={activeLineColor} onChange={e => setActiveLineColor(e.target.value)}
-                    style={{ width: 24, height: 20, border: 'none', borderRadius: 3, padding: 0, cursor: 'pointer' }} />
-                </div>
-                <div style={{ display: 'flex', alignItems: 'center', gap: 8 }}>
-                  <span style={{ fontSize: 11, color: textSub, width: 65 }}>Width</span>
-                  <input type="range" min={0.5} max={4} step={0.1} value={lineWidth}
-                    onChange={e => setLineWidth(parseFloat(e.target.value))}
-                    style={{ flex: 1 }} />
-                  <span style={{ fontSize: 10, color: textDim, width: 20, textAlign: 'right' }}>{lineWidth}</span>
-                </div>
-                <div style={{ display: 'flex', alignItems: 'center', gap: 8 }}>
-                  <span style={{ fontSize: 11, color: textSub, width: 65 }}>Highlight</span>
-                  <input type="range" min={1} max={5} step={0.2} value={activeLineWidth}
-                    onChange={e => setActiveLineWidth(parseFloat(e.target.value))}
-                    style={{ flex: 1 }} />
-                  <span style={{ fontSize: 10, color: textDim, width: 20, textAlign: 'right' }}>{activeLineWidth}</span>
-                </div>
-                <div style={{ display: 'flex', alignItems: 'center', gap: 8 }}>
-                  <span style={{ fontSize: 11, color: textSub, width: 65 }}>Opacity</span>
-                  <input type="range" min={0.1} max={1} step={0.05} value={lineOpacity}
-                    onChange={e => setLineOpacity(parseFloat(e.target.value))}
-                    style={{ flex: 1 }} />
-                  <span style={{ fontSize: 10, color: textDim, width: 20, textAlign: 'right' }}>{lineOpacity.toFixed(1)}</span>
-                </div>
-                <div style={{ display: 'flex', alignItems: 'center', gap: 8 }}>
-                  <span style={{ fontSize: 11, color: textSub, width: 65 }}>Style</span>
-                  <select value={lineDash} onChange={e => setLineDash(e.target.value as 'solid' | 'dashed' | 'dotted')}
+                  <span style={{ fontSize: 11, color: textSub, width: 60 }}>Style</span>
+                  <select
+                    value={lineDash}
+                    onChange={e => setLineDash(e.target.value as 'solid' | 'dashed' | 'dotted')}
                     style={{
                       flex: 1, background: inputBg, border: `1px solid ${borderColor}`,
-                      borderRadius: 4, padding: '3px 6px', color: textSub, fontSize: 11, outline: 'none',
-                    }}>
+                      borderRadius: 4, padding: '3px 6px', color: textSub,
+                      fontSize: 11, outline: 'none', cursor: 'pointer',
+                    }}
+                  >
                     <option value="solid">Solid</option>
                     <option value="dashed">Dashed</option>
                     <option value="dotted">Dotted</option>
@@ -803,42 +922,47 @@ export function GraphView() {
 
             {/* Layout */}
             <div>
-              <div style={{ fontSize: 9, fontWeight: 700, color: textDim, marginBottom: 8, textTransform: 'uppercase', letterSpacing: 0.8 }}>
+              <div style={{ fontSize: 9, fontWeight: 700, color: textDim, marginBottom: 8, textTransform: 'uppercase', letterSpacing: 1 }}>
                 Layout
               </div>
-              <div style={{ display: 'flex', flexDirection: 'column', gap: 6 }}>
+              <div style={{ display: 'flex', flexDirection: 'column', gap: 7 }}>
                 <div style={{ display: 'flex', alignItems: 'center', gap: 8 }}>
-                  <span style={{ fontSize: 11, color: textSub, width: 65 }}>Spread</span>
+                  <span style={{ fontSize: 11, color: textSub, width: 60 }}>Spread</span>
                   <input type="range" min={100} max={500} step={10} value={radialSpread}
-                    onChange={e => { setRadialSpread(parseInt(e.target.value)); }}
-                    style={{ flex: 1 }} />
+                    onChange={e => setRadialSpread(parseInt(e.target.value))}
+                    style={{ flex: 1, accentColor: accentPurple }} />
                   <span style={{ fontSize: 10, color: textDim, width: 24, textAlign: 'right' }}>{radialSpread}</span>
                 </div>
                 <label style={{ display: 'flex', alignItems: 'center', gap: 8, fontSize: 11, color: textSub, cursor: 'pointer' }}>
-                  <input type="checkbox" checked={showAllLabels} onChange={e => setShowAllLabels(e.target.checked)} />
+                  <input
+                    type="checkbox"
+                    checked={showAllLabels}
+                    onChange={e => setShowAllLabels(e.target.checked)}
+                    style={{ accentColor: accentPurple }}
+                  />
                   Show all labels
                 </label>
               </div>
             </div>
 
-            {/* Reset settings */}
+            {/* Reset */}
             <button
               onClick={() => {
-                setNodeColor('#b0b8c8'); setActiveNodeColor('#ffffff');
-                setLineColor('#5a6478'); setActiveLineColor('#8899aa');
+                setNodeColor('#7c6f9f'); setActiveNodeColor('#a78bfa');
+                setLineColor('#4a4460'); setActiveLineColor('#7c6f9f');
                 setNodeBaseSize(4); setConnBoost(1.2);
-                setLineWidth(1.2); setActiveLineWidth(2.0);
-                setLineOpacity(0.6); setLineDash('solid');
+                setLineWidth(1); setActiveLineWidth(2.0);
+                setLineOpacity(0.5); setLineDash('solid');
                 setShowAllLabels(false); setRadialSpread(220);
               }}
               style={{
                 width: '100%', padding: '7px 0',
                 background: inputBg, border: `1px solid ${borderColor}`,
                 borderRadius: 6, color: textSub, cursor: 'pointer',
-                fontSize: 11, fontWeight: 500,
+                fontSize: 11, fontWeight: 500, letterSpacing: 0.2,
               }}
-              onMouseEnter={e => { e.currentTarget.style.background = dark ? 'rgba(255,255,255,0.08)' : 'rgba(0,0,0,0.06)'; }}
-              onMouseLeave={e => { e.currentTarget.style.background = inputBg; }}
+              onMouseEnter={e => { e.currentTarget.style.background = 'rgba(124,111,159,0.15)'; e.currentTarget.style.color = textMain; }}
+              onMouseLeave={e => { e.currentTarget.style.background = inputBg; e.currentTarget.style.color = textSub; }}
             >
               Reset to defaults
             </button>
@@ -849,24 +973,31 @@ export function GraphView() {
       {/* Zoom controls */}
       <div style={{
         position: 'absolute', bottom: 16, right: 12,
-        display: 'flex', flexDirection: 'column', gap: 2,
+        display: 'flex', flexDirection: 'column', gap: 1,
         background: panelBg, border: `1px solid ${borderColor}`,
-        borderRadius: 8, padding: 3, backdropFilter: 'blur(8px)',
+        borderRadius: 8, padding: 3, backdropFilter: 'blur(12px)',
+        boxShadow: '0 4px 20px rgba(0,0,0,0.4)',
       }}>
         {[
-          { icon: <ZoomIn size={14} />, fn: () => handleZoom(0.2), t: 'Zoom in' },
-          { icon: <ZoomOut size={14} />, fn: () => handleZoom(-0.2), t: 'Zoom out' },
-          { icon: <Maximize2 size={14} />, fn: centerGraph, t: 'Center' },
-          { icon: <RotateCcw size={14} />, fn: resetView, t: 'Reset' },
+          { icon: <ZoomIn size={13} />, fn: () => handleZoom(0.2), t: 'Zoom in' },
+          { icon: <ZoomOut size={13} />, fn: () => handleZoom(-0.2), t: 'Zoom out' },
+          { icon: <Maximize2 size={13} />, fn: centerGraph, t: 'Center graph' },
+          { icon: <RotateCcw size={13} />, fn: resetView, t: 'Reset view' },
         ].map((b, i) => (
-          <button key={i} onClick={b.fn} title={b.t}
-            style={{
-              width: 32, height: 32, background: 'none', border: 'none',
-              color: textDim, cursor: 'pointer', borderRadius: 4,
-              display: 'flex', alignItems: 'center', justifyContent: 'center',
+          <button
+            key={i}
+            onClick={b.fn}
+            title={b.t}
+            style={btnBase}
+            onMouseEnter={e => {
+              e.currentTarget.style.background = 'rgba(124,111,159,0.18)';
+              e.currentTarget.style.color = textMain;
             }}
-            onMouseEnter={e => { e.currentTarget.style.background = inputBg; e.currentTarget.style.color = textMain; }}
-            onMouseLeave={e => { e.currentTarget.style.background = 'none'; e.currentTarget.style.color = textDim; }}>
+            onMouseLeave={e => {
+              e.currentTarget.style.background = 'none';
+              e.currentTarget.style.color = textDim;
+            }}
+          >
             {b.icon}
           </button>
         ))}
@@ -876,34 +1007,38 @@ export function GraphView() {
       <div style={{
         position: 'absolute', bottom: 16, left: 12,
         background: panelBg, border: `1px solid ${borderColor}`,
-        borderRadius: 8, padding: '10px 14px',
-        backdropFilter: 'blur(8px)',
+        borderRadius: 8, padding: '10px 13px',
+        backdropFilter: 'blur(12px)',
+        boxShadow: '0 4px 20px rgba(0,0,0,0.4)',
       }}>
-        <div style={{ fontSize: 10, fontWeight: 600, color: textDim, marginBottom: 8, textTransform: 'uppercase', letterSpacing: 0.5 }}>
+        <div style={{ fontSize: 9, fontWeight: 700, color: textDim, marginBottom: 8, textTransform: 'uppercase', letterSpacing: 0.8 }}>
           Legend
         </div>
-        <div style={{ display: 'flex', flexDirection: 'column', gap: 5 }}>
-          <div className="flex items-center gap-2">
-            <div style={{ width: 8, height: 8, borderRadius: '50%', background: activeNodeColor, border: `1.5px solid ${activeNodeColor}` }} />
-            <span style={{ fontSize: 10, color: textSub }}>Active note</span>
-          </div>
-          <div className="flex items-center gap-2">
-            <div style={{ width: 7, height: 7, borderRadius: '50%', background: nodeColor }} />
-            <span style={{ fontSize: 10, color: textSub }}>Connected</span>
-          </div>
-          <div className="flex items-center gap-2">
-            <div style={{ width: 5, height: 5, borderRadius: '50%', background: nodeColor, opacity: 0.35 }} />
-            <span style={{ fontSize: 10, color: textSub }}>Orphan</span>
-          </div>
+        <div style={{ display: 'flex', flexDirection: 'column', gap: 6 }}>
+          {[
+            { size: 8, color: activeNodeColor, opacity: 1, label: 'Active note', border: activeNodeColor },
+            { size: 7, color: nodeColor, opacity: 0.85, label: 'Connected' },
+            { size: 5, color: nodeColor, opacity: 0.28, label: 'Orphan' },
+          ].map(({ size, color, opacity, label, border }) => (
+            <div key={label} className="flex items-center gap-2">
+              <div style={{
+                width: size, height: size, borderRadius: '50%',
+                background: color, opacity,
+                flexShrink: 0,
+                ...(border ? { boxShadow: `0 0 6px ${border}60` } : {}),
+              }} />
+              <span style={{ fontSize: 10, color: textSub }}>{label}</span>
+            </div>
+          ))}
         </div>
         <div style={{
           marginTop: 8, paddingTop: 8,
           borderTop: `1px solid ${borderColor}`,
-          fontSize: 9, color: textDim, lineHeight: 1.6,
+          fontSize: 9, color: textDim, lineHeight: 1.7,
         }}>
           Scroll to zoom · Drag to pan
           <br />
-          Click node to open
+          Click node to open · Drag node to move
         </div>
       </div>
     </div>
