@@ -25,6 +25,8 @@ export function GraphView() {
   const selectedRef = useRef<string | null>(null);
   const groupTargetRef = useRef<Record<string, { x: number; y: number }>>({});
   const sizeRef = useRef({ w: 0, h: 0 });
+  const bloomRef = useRef<Map<string, { start: number; angle: number; magnitude: number; duration: number }>>(new Map());
+  const bloomStartRef = useRef(0);
   const [graphStats, setGraphStats] = useState({ nodes: 0, edges: 0 });
   const [filterQuery, setFilterQuery] = useState('');
   const [depthFilter, setDepthFilter] = useState(0);
@@ -177,6 +179,11 @@ export function GraphView() {
       const edges = edgesRef.current;
       const cx = sizeRef.current.w / 2;
       const cy = sizeRef.current.h / 2;
+      const now = performance.now();
+      const isBlooming = bloomRef.current.size > 0;
+      const bloomElapsed = now - bloomStartRef.current;
+      const forceScale = isBlooming ? Math.min(1, bloomElapsed / 3500) : 1;
+      const gravScale = isBlooming ? Math.min(1, bloomElapsed / 4500) : 1;
 
       // Strong Repulsion to prevent overlap
       for (let i = 0; i < nodes.length; i++) {
@@ -185,7 +192,7 @@ export function GraphView() {
           const dy = nodes[j].y - nodes[i].y;
           const d = Math.max(Math.sqrt(dx * dx + dy * dy), 1);
           const sameGroup = nodes[i].group === nodes[j].group;
-          const f = (sameGroup ? 8000 : 14000) / (d * d);
+          const f = ((sameGroup ? 8000 : 14000) / (d * d)) * forceScale;
           const fx = (dx / d) * f;
           const fy = (dy / d) * f;
           nodes[i].vx -= fx; nodes[i].vy -= fy;
@@ -199,7 +206,7 @@ export function GraphView() {
         if (!a || !b) continue;
         const dx = b.x - a.x; const dy = b.y - a.y;
         const d = Math.max(Math.sqrt(dx * dx + dy * dy), 1);
-        const f = (d - linkDistance) * 0.008;
+        const f = (d - linkDistance) * 0.008 * forceScale;
         const fx = (dx / d) * f;
         const fy = (dy / d) * f;
         a.vx += fx; a.vy += fy;
@@ -208,13 +215,29 @@ export function GraphView() {
 
       // Center & Group gravity
       for (const n of nodes) {
-        n.vx += (cx - n.x) * centerForce;
-        n.vy += (cy - n.y) * centerForce;
+        n.vx += (cx - n.x) * centerForce * gravScale;
+        n.vy += (cy - n.y) * centerForce * gravScale;
 
         const gt = groupTargetRef.current[n.group];
         if (gt) {
-          n.vx += (gt.x - n.x) * groupPull;
-          n.vy += (gt.y - n.y) * groupPull;
+          n.vx += (gt.x - n.x) * groupPull * gravScale;
+          n.vy += (gt.y - n.y) * groupPull * gravScale;
+        }
+      }
+
+      // Bloom forces — gradual outward push with smooth easing
+      for (const n of nodes) {
+        const bloom = bloomRef.current.get(n.id);
+        if (bloom) {
+          const elapsed = now - bloom.start;
+          if (elapsed > 0 && elapsed < bloom.duration) {
+            const t = elapsed / bloom.duration;
+            const ease = Math.sin(t * Math.PI);
+            n.vx += Math.cos(bloom.angle) * bloom.magnitude * ease;
+            n.vy += Math.sin(bloom.angle) * bloom.magnitude * ease;
+          } else if (elapsed >= bloom.duration) {
+            bloomRef.current.delete(n.id);
+          }
         }
       }
 
@@ -224,10 +247,12 @@ export function GraphView() {
           n.vx = 0; n.vy = 0;
           continue;
         }
-        n.vx *= 0.82;
-        n.vy *= 0.82;
+        const damping = isBlooming ? 0.935 : 0.82;
+        n.vx *= damping;
+        n.vy *= damping;
+        const maxSpd = isBlooming ? 6 : 18;
         const speed = Math.sqrt(n.vx * n.vx + n.vy * n.vy);
-        if (speed > 18) { n.vx = (n.vx / speed) * 18; n.vy = (n.vy / speed) * 18; }
+        if (speed > maxSpd) { n.vx = (n.vx / speed) * maxSpd; n.vy = (n.vy / speed) * maxSpd; }
         n.x += n.vx; n.y += n.vy;
       }
     }
@@ -288,25 +313,34 @@ export function GraphView() {
       ctx!.translate(p.x, p.y);
       ctx!.scale(z, z);
 
+      const drawTime = performance.now();
+
       // Edges
       for (const e of edges) {
         const a = getNode(e.from); const b = getNode(e.to);
         if (!a || !b) continue;
         if (visibleIds && (!visibleIds.has(a.id) || !visibleIds.has(b.id))) continue;
         if (queryLower && !matchesFilter(a) && !matchesFilter(b)) continue;
+
+        const bloomA = bloomRef.current.get(a.id);
+        const bloomB = bloomRef.current.get(b.id);
+        const edgeBloomAlpha = Math.min(
+          bloomA ? Math.min(1, Math.max(0, (drawTime - bloomA.start) / 800)) : 1,
+          bloomB ? Math.min(1, Math.max(0, (drawTime - bloomB.start) / 800)) : 1
+        );
         
         const isConnectedToSelected = selectedRef.current && (e.from === selectedRef.current || e.to === selectedRef.current);
         const isHovered = hoverRef.current === e.from || hoverRef.current === e.to;
 
         ctx!.beginPath();
         if (isConnectedToSelected) {
-          ctx!.strokeStyle = `rgba(70, 140, 240, ${Math.min(1, edgeOpacity + 0.3)})`;
+          ctx!.strokeStyle = `rgba(70, 140, 240, ${Math.min(1, edgeOpacity + 0.3) * edgeBloomAlpha})`;
           ctx!.lineWidth = 1.8;
         } else if (isHovered) {
-          ctx!.strokeStyle = `rgba(180, 200, 225, ${edgeOpacity})`;
+          ctx!.strokeStyle = `rgba(180, 200, 225, ${edgeOpacity * edgeBloomAlpha})`;
           ctx!.lineWidth = 1.2;
         } else {
-          ctx!.strokeStyle = `rgba(140, 156, 180, ${edgeOpacity * 0.7})`;
+          ctx!.strokeStyle = `rgba(140, 156, 180, ${edgeOpacity * 0.7 * edgeBloomAlpha})`;
           ctx!.lineWidth = 0.8;
         }
         ctx!.moveTo(a.x, a.y);
@@ -319,7 +353,11 @@ export function GraphView() {
         if (visibleIds && !visibleIds.has(n.id)) continue;
         if (queryLower && !matchesFilter(n) && n.conns === 0) continue;
 
-        const r = (2.5 + Math.floor(n.conns / 6) * 0.5) * nodeScale;
+        const bloom = bloomRef.current.get(n.id);
+        const bloomScale = bloom ? Math.min(1, Math.max(0, (drawTime - bloom.start) / 700)) : 1;
+        const bloomAlpha = bloom ? Math.min(1, Math.max(0, (drawTime - bloom.start + 100) / 600)) : 1;
+
+        const r = ((2.5 + Math.floor(n.conns / 6) * 0.5) * nodeScale) * bloomScale;
         const isSelected = n.id === selectedRef.current;
         const isNeighbor = selectedNeighbors.has(n.id);
         const isHovered = n.id === hoverRef.current;
@@ -329,16 +367,16 @@ export function GraphView() {
         if (isSelected) {
           ctx!.beginPath();
           ctx!.arc(n.x, n.y, r + 8, 0, Math.PI * 2);
-          ctx!.fillStyle = 'rgba(70, 140, 240, 0.15)';
+          ctx!.fillStyle = `rgba(70, 140, 240, ${0.15 * bloomAlpha})`;
           ctx!.fill();
           ctx!.beginPath();
           ctx!.arc(n.x, n.y, r + 4, 0, Math.PI * 2);
-          ctx!.fillStyle = 'rgba(70, 140, 240, 0.25)';
+          ctx!.fillStyle = `rgba(70, 140, 240, ${0.25 * bloomAlpha})`;
           ctx!.fill();
         } else if (isHovered) {
           ctx!.beginPath();
           ctx!.arc(n.x, n.y, r + 5, 0, Math.PI * 2);
-          ctx!.fillStyle = 'rgba(200, 210, 225, 0.1)';
+          ctx!.fillStyle = `rgba(200, 210, 225, ${0.1 * bloomAlpha})`;
           ctx!.fill();
         }
 
@@ -349,26 +387,34 @@ export function GraphView() {
           ctx!.fillStyle = 'rgba(70,70,70,0.35)';
           ctx!.fill();
         } else if (isSelected) {
+          ctx!.globalAlpha = bloomAlpha;
           ctx!.fillStyle = '#4a90e2';
           ctx!.fill();
+          ctx!.globalAlpha = 1;
         } else if (isNeighbor) {
+          ctx!.globalAlpha = 0.9 * bloomAlpha;
           ctx!.fillStyle = 'rgba(120, 170, 230, 0.9)';
           ctx!.fill();
+          ctx!.globalAlpha = 1;
         } else if (groupColor) {
+          ctx!.globalAlpha = 0.9 * bloomAlpha;
           ctx!.fillStyle = groupColor;
-          ctx!.globalAlpha = 0.9;
           ctx!.fill();
           ctx!.globalAlpha = 1;
         } else {
+          ctx!.globalAlpha = 0.85 * bloomAlpha;
           ctx!.fillStyle = 'rgba(180, 190, 205, 0.85)';
           ctx!.fill();
+          ctx!.globalAlpha = 1;
         }
 
         if (!dimmed && (showAllLabels || isHovered || isSelected || isNeighbor)) {
+          ctx!.globalAlpha = bloomAlpha;
           ctx!.fillStyle = isSelected || isNeighbor ? theme.text : theme.textSecondary;
           ctx!.font = `${isSelected ? 'bold 11' : '10'}px -apple-system, system-ui, sans-serif`;
           ctx!.textAlign = 'center';
           ctx!.fillText(n.title, n.x, n.y + r + 14);
+          ctx!.globalAlpha = 1;
         }
       }
 
@@ -461,16 +507,31 @@ export function GraphView() {
   };
 
   const animate = () => {
-    const cx = sizeRef.current.w / 2; const cy = sizeRef.current.h / 2;
+    const cx = sizeRef.current.w / 2;
+    const cy = sizeRef.current.h / 2;
     physicsRef.current = true;
-    nodesRef.current.forEach(n => { n.x = cx; n.y = cy; n.vx = 0; n.vy = 0; });
+    bloomRef.current.clear();
+    const now = performance.now();
+    bloomStartRef.current = now;
+
+    nodesRef.current.forEach(n => {
+      n.x = cx + (Math.random() - 0.5) * 2;
+      n.y = cy + (Math.random() - 0.5) * 2;
+      n.vx = 0;
+      n.vy = 0;
+    });
+
+    const total = nodesRef.current.length;
     nodesRef.current.forEach((n, i) => {
-      setTimeout(() => {
-        const angle = (i / nodesRef.current.length) * Math.PI * 2;
-        const speed = 3 + n.conns * 0.8; // Smoother, slower burst
-        n.vx = Math.cos(angle) * speed;
-        n.vy = Math.sin(angle) * speed;
-      }, i * 8); // Faster stagger for fluid bloom effect
+      const angle = (i / total) * Math.PI * 2 + (Math.random() - 0.5) * 0.5;
+      const magnitude = 0.25 + n.conns * 0.05 + Math.random() * 0.1;
+      const duration = 2800 + Math.random() * 1400;
+      bloomRef.current.set(n.id, {
+        start: now + i * 18,
+        angle,
+        magnitude,
+        duration,
+      });
     });
   };
 
