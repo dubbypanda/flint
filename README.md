@@ -35,17 +35,6 @@ bash install.sh
 > [!IMPORTANT]  
 > - Make sure that you installed all the required libraries like Flask, requests, and llama-cpp so that the agent can work, and launch it from the terminal for the agent to start and use, and launch it from the app menu if you only want a GUI for the non-taking. 
 
-### For errors @
-```bash
-bash update.sh
-npm audit fix --force
-```
-
-### For devloping ,
-```bash
-git clone --branch <branch name> --single-branch https://github.com/Chintanpatel24/flint.git
-```
-
 ---
 
 ## Features
@@ -78,9 +67,3 @@ git clone --branch <branch name> --single-branch https://github.com/Chintanpatel
 - **localStorage** for persistence
 - **No external API calls** (except Wikipedia when internet access is enabled)
 - **File System Access API** to open any local folder as a vault
-
----
-
-> [!IMPORTANT]  
->Please inform me by creating an issue regarding your installation. After an installation, it makes your desktop slow, or it works fine, because after some changes it's not working as functionally and fastly as last. 
->I think it happens only after some time after an installation; after some time it works fine and without making the desktop slow.
