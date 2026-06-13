@@ -40,7 +40,7 @@ bash install.sh
 
 ## Features
 
->### Note-Taking
+### Note-Taking
 - Full **Markdown** support with live preview
 - **Wiki Links** (`[[Note Name]]`) to connect notes
 - **Tags** (`#tag`) for categorization
@@ -48,14 +48,14 @@ bash install.sh
 - Split view (Editor + Preview)
 - Formatting toolbar (Bold, Italic, Heading, Quote, Code, Links, Lists)
 
->### Graph View
+### Graph View
 - Interactive **force-directed graph** visualization
 - Node size scales with connection count
 - Physics simulation - drag nodes, connected notes follow
 - Zoom, pan, search, depth filter
 - Curved edges between connected notes
 
->### AI Agent (Python + Ollama + GGUF + APIs)
+### AI Agent (Python + Ollama + GGUF + APIs)
 - **Real Python backend** that connects to Ollama locally
 - **Notes = Memory** - AI reads all your notes and graph connections
 - **Internet access** - AI searches Wikipedia for real-time info
@@ -63,8 +63,14 @@ bash install.sh
 - **Streaming responses** in real-time
 - **Browser fallback** when agent is not running
 
->### Local & Secure 
+### Local & Secure 
 - **No cloud, no tracking** - all data stays on your device
 - **localStorage** for persistence
 - **No external API calls** (except Wikipedia when internet access is enabled)
 - **File System Access API** to open any local folder as a vault
+
+>[!important]
+> - This project needs developer support across a community, and this project may contain bugs and glitches, so if you notice something, please make an issue and feel free to make a PR for that.
+> - This project is inspired by [Obsidian](https://obsidian.md/), and I just want to create an open-source UI that gives a feel like Obsidian, and I try to make it and add some
+other features that may help the community, and that's it.
+> - So for your daily usage you can prefer [Obsidian](https://github.com/obsidianmd) and go with it. This project is for those who want a UI of Obsidian for their projects or for     some other reasons and also for those who only use open-source and all-time trusted tools and items. 
