@@ -33,7 +33,8 @@ git clone https://github.com/Chintanpatel24/flint.git
 cd flint
 bash install.sh
 ```
-> [!IMPORTANT]  
+> [!IMPORTANT]
+> - Under active devlopment !!
 > - Make sure that you installed all the required libraries like Flask, requests, and llama-cpp so that the agent can work, and launch it from the terminal for the agent to start and use, and launch it from the app menu if you only want a GUI for the note-taking. 
 
 ---
