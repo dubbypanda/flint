@@ -75,3 +75,13 @@ bash install.sh
 > - This project is inspired by [Obsidian](https://obsidian.md/), and I just want to create an open-source UI that gives a feel like Obsidian, and I try to make it and add some
 other features that may help the community, and that's it.
 > - So for your daily usage you can prefer [Obsidian](https://github.com/obsidianmd) and go with it. This project is for those who want a UI of Obsidian for their projects or for     some other reasons and also for those who only use open-source and all-time trusted tools and items. 
+
+## Star History
+
+<a href="https://www.star-history.com/?repos=chintanpatel24%2Fflint&type=date&legend=top-left">
+ <picture>
+   <source media="(prefers-color-scheme: dark)" srcset="https://api.star-history.com/chart?repos=chintanpatel24/flint&type=date&theme=dark&legend=top-left" />
+   <source media="(prefers-color-scheme: light)" srcset="https://api.star-history.com/chart?repos=chintanpatel24/flint&type=date&legend=top-left" />
+   <img alt="Star History Chart" src="https://api.star-history.com/chart?repos=chintanpatel24/flint&type=date&legend=top-left" />
+ </picture>
+</a>
