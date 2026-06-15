@@ -1,8 +1,7 @@
 @echo off
 :: ============================
-:: Flint — Install Script v4
+:: Flint — Install Script 
 :: Windows Port
-:: With Python AI Agent
 :: ============================
 
 setlocal EnableDelayedExpansion
