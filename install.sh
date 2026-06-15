@@ -2,7 +2,7 @@
 set -e
 
 # ============================
-# Flint — Install Script v4
+# Flint — Install Script
 # With Python AI Agent
 # ============================
 
