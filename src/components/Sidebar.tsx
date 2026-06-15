@@ -1,6 +1,6 @@
-import { useState } from 'react';
+import { useState, useRef, useEffect } from 'react';
 import { useStore } from '../store';
-import { FileText, Folder, FolderOpen, ChevronRight, ChevronDown, Plus, FolderPlus, Search, Pin, Trash2, CalendarDays } from 'lucide-react';
+import { FileText, Folder, FolderOpen, ChevronRight, ChevronDown, Plus, FolderPlus, Search, Pin, Trash2, CalendarDays, Pencil } from 'lucide-react';
 
 export function Sidebar() {
   const { state, dispatch, createNote, createFolder, openDailyNote } = useStore();
@@ -8,6 +8,8 @@ export function Sidebar() {
   const [ctx, setCtx] = useState<{ type: 'note' | 'folder'; id: string; x: number; y: number } | null>(null);
   const [newFolderName, setNewFolderName] = useState('');
   const [showNewFolder, setShowNewFolder] = useState(false);
+  const [renamingNoteId, setRenamingNoteId] = useState<string | null>(null);
+  const [renamingFolderId, setRenamingFolderId] = useState<string | null>(null);
 
   const filtered = search.trim()
     ? state.notes.filter(n => n.title.toLowerCase().includes(search.toLowerCase()))
@@ -78,6 +80,9 @@ export function Sidebar() {
             </div>
             {pinnedNotes.map(note => (
               <NoteItem key={note.id} note={note} active={note.id === state.activeNoteId}
+                renaming={renamingNoteId === note.id}
+                onRename={(newTitle) => { dispatch({ type: 'RENAME_NOTE', payload: { id: note.id, title: newTitle } }); setRenamingNoteId(null); }}
+                onCancelRename={() => setRenamingNoteId(null)}
                 onClick={() => dispatch({ type: 'OPEN_TAB', payload: note.id })}
                 onContext={(e) => { e.preventDefault(); setCtx({ type: 'note', id: note.id, x: e.clientX, y: e.clientY }); }} />
             ))}
@@ -87,19 +92,34 @@ export function Sidebar() {
         {/* Folders */}
         {folders.map(folder => {
           const notes = filtered.filter(n => n.folderId === folder.id);
+          const isRenaming = renamingFolderId === folder.id;
           return (
             <div key={folder.id}>
               <div className="flex items-center gap-1 cursor-pointer"
                 style={{ padding: '4px 12px', color: '#666', fontSize: 12 }}
-                onClick={() => dispatch({ type: 'TOGGLE_FOLDER', payload: folder.id })}
+                onClick={() => !isRenaming && dispatch({ type: 'TOGGLE_FOLDER', payload: folder.id })}
                 onContextMenu={e => { e.preventDefault(); setCtx({ type: 'folder', id: folder.id, x: e.clientX, y: e.clientY }); }}>
                 {folder.collapsed ? <ChevronRight size={12} /> : <ChevronDown size={12} />}
                 {folder.collapsed ? <Folder size={13} /> : <FolderOpen size={13} />}
-                <span style={{ marginLeft: 4 }}>{folder.name}</span>
-                <span style={{ marginLeft: 'auto', fontSize: 10, color: '#333' }}>{notes.length}</span>
+                
+                {isRenaming ? (
+                  <RenameInput 
+                    initialValue={folder.name}
+                    onSave={(newName) => { dispatch({ type: 'SET_STATE', payload: { ...state, folders: state.folders.map(f => f.id === folder.id ? { ...f, name: newName } : f) } }); setRenamingFolderId(null); }}
+                    onCancel={() => setRenamingFolderId(null)}
+                  />
+                ) : (
+                  <>
+                    <span style={{ marginLeft: 4 }}>{folder.name}</span>
+                    <span style={{ marginLeft: 'auto', fontSize: 10, color: '#333' }}>{notes.length}</span>
+                  </>
+                )}
               </div>
               {!folder.collapsed && notes.map(note => (
                 <NoteItem key={note.id} note={note} active={note.id === state.activeNoteId} indented
+                  renaming={renamingNoteId === note.id}
+                  onRename={(newTitle) => { dispatch({ type: 'RENAME_NOTE', payload: { id: note.id, title: newTitle } }); setRenamingNoteId(null); }}
+                  onCancelRename={() => setRenamingNoteId(null)}
                   onClick={() => dispatch({ type: 'OPEN_TAB', payload: note.id })}
                   onContext={(e) => { e.preventDefault(); setCtx({ type: 'note', id: note.id, x: e.clientX, y: e.clientY }); }} />
               ))}
@@ -110,6 +130,9 @@ export function Sidebar() {
         {/* Root notes */}
         {rootNotes.map(note => (
           <NoteItem key={note.id} note={note} active={note.id === state.activeNoteId}
+            renaming={renamingNoteId === note.id}
+            onRename={(newTitle) => { dispatch({ type: 'RENAME_NOTE', payload: { id: note.id, title: newTitle } }); setRenamingNoteId(null); }}
+            onCancelRename={() => setRenamingNoteId(null)}
             onClick={() => dispatch({ type: 'OPEN_TAB', payload: note.id })}
             onContext={(e) => { e.preventDefault(); setCtx({ type: 'note', id: note.id, x: e.clientX, y: e.clientY }); }} />
         ))}
@@ -137,12 +160,14 @@ export function Sidebar() {
           className="animate-scale-in">
           {ctx.type === 'note' && (
             <>
+              <CtxItem icon={<Pencil size={12} />} label="Rename note" onClick={() => { setRenamingNoteId(ctx.id); setCtx(null); }} />
               <CtxItem icon={<Pin size={12} />} label="Toggle pin" onClick={() => { dispatch({ type: 'PIN_NOTE', payload: ctx.id }); setCtx(null); }} />
               <CtxItem icon={<Trash2 size={12} />} label="Delete note" onClick={() => { dispatch({ type: 'DELETE_NOTE', payload: ctx.id }); setCtx(null); }} />
             </>
           )}
           {ctx.type === 'folder' && (
             <>
+              <CtxItem icon={<Pencil size={12} />} label="Rename folder" onClick={() => { setRenamingFolderId(ctx.id); setCtx(null); }} />
               <CtxItem icon={<Plus size={12} />} label="New note here" onClick={() => { createNote(ctx.id); setCtx(null); }} />
               <CtxItem icon={<Trash2 size={12} />} label="Delete folder" onClick={() => { dispatch({ type: 'DELETE_FOLDER', payload: ctx.id }); setCtx(null); }} />
             </>
@@ -153,7 +178,7 @@ export function Sidebar() {
   );
 }
 
-function NoteItem({ note, active, indented, onClick, onContext }: { note: { id: string; title: string }; active: boolean; indented?: boolean; onClick: () => void; onContext: (e: React.MouseEvent) => void; }) {
+function NoteItem({ note, active, indented, renaming, onClick, onContext, onRename, onCancelRename }: { note: { id: string; title: string }; active: boolean; indented?: boolean; renaming?: boolean; onClick: () => void; onContext: (e: React.MouseEvent) => void; onRename?: (title: string) => void; onCancelRename?: () => void; }) {
   const handleDragStart = (e: React.DragEvent<HTMLDivElement>) => {
     e.dataTransfer.setData('text/flint-note-id', note.id);
     e.dataTransfer.setData('text/flint-note-title', note.title);
@@ -163,16 +188,53 @@ function NoteItem({ note, active, indented, onClick, onContext }: { note: { id: 
 
   return (
     <div className="flex items-center gap-2 cursor-pointer"
-      draggable
+      draggable={!renaming}
       style={{ padding: '5px 12px', paddingLeft: indented ? 28 : 12, background: active ? '#232934' : 'transparent', borderLeft: active ? '2px solid #93a4c0' : '2px solid transparent', transition: 'all 0.08s' }}
-      onClick={onClick}
+      onClick={() => !renaming && onClick()}
       onDragStart={handleDragStart}
       onContextMenu={onContext}
-      onMouseEnter={e => { if (!active) e.currentTarget.style.background = '#1d222b'; }}
-      onMouseLeave={e => { if (!active) e.currentTarget.style.background = 'transparent'; }}>
+      onMouseEnter={e => { if (!active && !renaming) e.currentTarget.style.background = '#1d222b'; }}
+      onMouseLeave={e => { if (!active && !renaming) e.currentTarget.style.background = 'transparent'; }}>
       <FileText size={13} style={{ color: active ? '#c7d1de' : '#7b8698', flexShrink: 0 }} />
-      <span style={{ fontSize: 12, color: active ? '#eef2f8' : '#b0b9c8', overflow: 'hidden', textOverflow: 'ellipsis', whiteSpace: 'nowrap' as const }}>{note.title}</span>
+      {renaming ? (
+        <RenameInput initialValue={note.title} onSave={onRename!} onCancel={onCancelRename!} />
+      ) : (
+        <span style={{ fontSize: 12, color: active ? '#eef2f8' : '#b0b9c8', overflow: 'hidden', textOverflow: 'ellipsis', whiteSpace: 'nowrap' as const }}>{note.title}</span>
+      )}
     </div>
+  );
+}
+
+function RenameInput({ initialValue, onSave, onCancel }: { initialValue: string; onSave: (val: string) => void; onCancel: () => void; }) {
+  const [val, setVal] = useState(initialValue);
+  const inputRef = useRef<HTMLInputElement>(null);
+
+  useEffect(() => {
+    inputRef.current?.focus();
+    inputRef.current?.select();
+  }, []);
+
+  return (
+    <input 
+      ref={inputRef}
+      value={val}
+      onChange={e => setVal(e.target.value)}
+      onKeyDown={e => {
+        if (e.key === 'Enter') {
+          e.preventDefault();
+          onSave(val.trim() || initialValue);
+        } else if (e.key === 'Escape') {
+          e.preventDefault();
+          onCancel();
+        }
+      }}
+      onBlur={() => onSave(val.trim() || initialValue)}
+      onClick={e => e.stopPropagation()}
+      style={{
+        flex: 1, padding: '2px 4px', background: '#0a0a0a', border: '1px solid #333', 
+        borderRadius: 4, color: '#fff', fontSize: 12, outline: 'none', marginLeft: 2
+      }}
+    />
   );
 }
 

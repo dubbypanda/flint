@@ -15,21 +15,18 @@ const ICON_FILE = path.join(APP_DIR, 'icon.png');
 
 // ── Start Python AI Agent ──────────────────────────────────
 function startAgent() {
-  const agentDir = path.join(APP_DIR, 'agent');
-  const agentScript = path.join(agentDir, 'agent.py');
+  const binDir = path.join(APP_DIR, 'bin');
+  const executableName = process.platform === 'win32' ? 'agent.exe' : 'agent';
+  const agentExecutable = path.join(binDir, executableName);
 
-  if (!fs.existsSync(agentScript)) {
-    console.log('[Flint] No agent found — AI will use browser fallback');
+  if (!fs.existsSync(agentExecutable)) {
+    console.log(`[Flint] No compiled agent found at ${agentExecutable} — AI will use browser fallback`);
     return;
   }
 
-  console.log('[Flint] Starting Python AI agent...');
+  console.log('[Flint] Starting standalone AI agent binary...');
 
-  // Try python3 first, then python
-  const pythonCmd = process.platform === 'win32' ? 'python' : 'python3';
-
-  agentProcess = spawn(pythonCmd, [agentScript], {
-    cwd: agentDir,
+  agentProcess = spawn(agentExecutable, [], {
     env: { ...process.env },
     stdio: ['pipe', 'pipe', 'pipe'],
     detached: false,
