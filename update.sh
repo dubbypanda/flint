@@ -12,7 +12,6 @@ NC='\033[0m'
 FLINT_DIR="$HOME/.flint"
 SCRIPT_DIR="$(cd "$(dirname "${BASH_SOURCE[0]}")" && pwd)"
 
-# ✅ YOUR GITHUB REPO
 REPO_URL="https://github.com/Chintanpatel24/flint.git"
 BRANCH="main"
 
@@ -25,7 +24,6 @@ echo -e "██║     ███████╗██║██║ ╚███�
 echo -e "╚═╝     ╚══════╝╚═╝╚═╝  ╚═══╝   ╚═╝    "
 echo ""
 
-# Check if installed
 if [ ! -d "$FLINT_DIR/app" ]; then
     echo -e "${YELLOW}Flint is not installed. Run bash install.sh first.${NC}"
     exit 1
@@ -35,7 +33,7 @@ fi
 echo -e "${BLUE}[1/3]${NC} Checking for updates..."
 
 if [ -d "$SCRIPT_DIR/.git" ]; then
-    # ✅ Already a git repo — force origin to your URL
+    
     git -C "$SCRIPT_DIR" remote set-url origin "$REPO_URL" 2>/dev/null || \
     git -C "$SCRIPT_DIR" remote add origin "$REPO_URL" 2>/dev/null || true
 
@@ -55,7 +53,7 @@ if [ -d "$SCRIPT_DIR/.git" ]; then
     git -C "$SCRIPT_DIR" pull origin "$BRANCH" 2>/dev/null || true
 
 else
-    # ✅ No git folder — clone fresh from your GitHub URL
+   
     echo -e "      ${DIM}No git folder found. Cloning from GitHub...${NC}"
 
     TEMP_CLONE="$FLINT_DIR/.clone"
@@ -66,7 +64,7 @@ else
         exit 1
     fi
 
-    # Copy new files into SCRIPT_DIR (excluding .git folder)
+   
     rsync -a --exclude='.git' "$TEMP_CLONE/" "$SCRIPT_DIR/"
 
     rm -rf "$TEMP_CLONE"
@@ -74,7 +72,7 @@ else
     echo -e "      ${DIM}Source updated from GitHub.${NC}"
 fi
 
-# Rebuild
+
 echo -e "${BLUE}[2/3]${NC} Rebuilding..."
 
 BUILD_DIR="$FLINT_DIR/.build"
