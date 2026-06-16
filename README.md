@@ -13,7 +13,10 @@
 
 # ***Flint*** 
 
-> - A **secure, local-first knowledge base** with AI-powered intelligence. Your notes, your graph, your AI - all running locally on your machine.
+>[!important]
+>Use the latest release of Flint because a main branch caused an error. at that time 
+
+- A **secure, local-first knowledge base** with AI-powered intelligence. Your notes, your graph, your AI - all running locally on your machine.
 
 ---
 
