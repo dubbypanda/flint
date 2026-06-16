@@ -1,10 +1,10 @@
-// Flint — Electron Desktop Wrapper
-// .cjs = guaranteed CommonJS regardless of any "type":"module"
+// Flint Electron desktop wrapper.
+// .cjs keeps this file CommonJS regardless of package module settings.
 
 const { app, BrowserWindow, Menu, shell } = require('electron');
 const path = require('path');
 const fs = require('fs');
-const { spawn } = require('child_process');
+const { spawn, spawnSync } = require('child_process');
 
 let mainWindow = null;
 let agentProcess = null;
@@ -13,27 +13,44 @@ const APP_DIR = __dirname;
 const DIST_FILE = path.join(APP_DIR, 'dist', 'index.html');
 const ICON_FILE = path.join(APP_DIR, 'icon.png');
 
-// ── Start Python AI Agent ──────────────────────────────────
+function commandExists(command) {
+  const checker = process.platform === 'win32' ? 'where' : 'which';
+  const result = spawnSync(checker, [command], { stdio: 'ignore' });
+  return result.status === 0;
+}
+
 function startAgent() {
   const agentDir = path.join(APP_DIR, 'agent');
   const agentScript = path.join(agentDir, 'agent.py');
+  const bundledAgent = path.join(APP_DIR, 'bin', process.platform === 'win32' ? 'agent.exe' : 'agent');
 
-  if (!fs.existsSync(agentScript)) {
-    console.log('[Flint] No agent found — AI will use browser fallback');
+  if (fs.existsSync(bundledAgent)) {
+    console.log('[Flint] Starting bundled AI agent...');
+    agentProcess = spawn(bundledAgent, [], {
+      cwd: path.dirname(bundledAgent),
+      env: { ...process.env },
+      stdio: ['pipe', 'pipe', 'pipe'],
+      detached: false,
+    });
+  } else if (fs.existsSync(agentScript)) {
+    console.log('[Flint] Starting Python AI agent...');
+    const pythonCandidates = process.platform === 'win32' ? ['python', 'py'] : ['python3', 'python'];
+    const pythonCmd = pythonCandidates.find(commandExists);
+    if (!pythonCmd) {
+      console.log('[Flint] Python was not found. Note features remain available.');
+      return;
+    }
+    const pythonArgs = pythonCmd === 'py' ? ['-3', agentScript] : [agentScript];
+    agentProcess = spawn(pythonCmd, pythonArgs, {
+      cwd: agentDir,
+      env: { ...process.env },
+      stdio: ['pipe', 'pipe', 'pipe'],
+      detached: false,
+    });
+  } else {
+    console.log('[Flint] No AI agent found. Note features remain available.');
     return;
   }
-
-  console.log('[Flint] Starting Python AI agent...');
-
-  // Try python3 first, then python
-  const pythonCmd = process.platform === 'win32' ? 'python' : 'python3';
-
-  agentProcess = spawn(pythonCmd, [agentScript], {
-    cwd: agentDir,
-    env: { ...process.env },
-    stdio: ['pipe', 'pipe', 'pipe'],
-    detached: false,
-  });
 
   agentProcess.stdout.on('data', (data) => {
     const msg = data.toString().trim();
@@ -49,7 +66,7 @@ function startAgent() {
 
   agentProcess.on('error', (err) => {
     console.log('[Flint] Agent failed to start:', err.message);
-    console.log('[Flint] Install Python + Flask: pip3 install flask flask-cors requests');
+    console.log('[Flint] Install Python packages with: pip install -r agent/requirements.txt');
   });
 
   agentProcess.on('exit', (code) => {
@@ -66,12 +83,10 @@ function stopAgent() {
   }
 }
 
-// ── Create Window ──────────────────────────────────────────
-
 function createWindow() {
   if (!fs.existsSync(DIST_FILE)) {
     console.error('[Flint] ERROR: dist/index.html not found at ' + DIST_FILE);
-    console.error('[Flint] Run: bash install.sh');
+    console.error('[Flint] Reinstall Flint from the official installer.');
     app.quit();
     return;
   }
@@ -121,8 +136,6 @@ function createWindow() {
   });
 }
 
-// ── App Lifecycle ──────────────────────────────────────────
-
 const gotLock = app.requestSingleInstanceLock();
 if (!gotLock) {
   app.quit();
@@ -135,10 +148,9 @@ if (!gotLock) {
   });
 
   app.whenReady().then(() => {
-    // Start Python agent before creating window
     startAgent();
     createWindow();
-    console.log('[Flint] App ready — desktop mode');
+    console.log('[Flint] App ready in desktop mode');
   });
 
   app.on('window-all-closed', () => {
