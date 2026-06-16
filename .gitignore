@@ -8,3 +8,5 @@ electron/bin/
 agent/build/
 agent/agent.spec
 build/
+temp_asar/
+electron_log.txt
