@@ -10,6 +10,8 @@
 # ***Flint***
 - Flint is a secure, local-first knowledge base with markdown notes, linked-note navigation, a visual graph, an infinite canvas, and optional AI assistance through local services.
 
+https://github.com/user-attachments/assets/8f570dfe-9b1c-4076-8c05-b6f0e0d29be1
+
 ## Install
 
 Linux and macOS:
