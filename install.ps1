@@ -158,9 +158,9 @@ if ($PythonCmd -and (Test-Path (Join-Path $AgentHome "requirements.txt"))) {
 Write-Step 7 "Installing desktop app"
 Copy-Item -LiteralPath (Join-Path $BuildDir "electron\main.cjs") -Destination (Join-Path $FlintApp "main.cjs") -Force
 Copy-Item -LiteralPath (Join-Path $BuildDir "dist") -Destination (Join-Path $FlintApp "dist") -Recurse -Force
-$Logo = Join-Path $BuildDir "public\flint-logo.png"
-if (Test-Path $Logo) {
-  Copy-Item -LiteralPath $Logo -Destination (Join-Path $FlintApp "icon.png") -Force
+$LogoIco = Join-Path $BuildDir "public\flint-logo.ico"
+if (Test-Path $LogoIco) {
+  Copy-Item -LiteralPath $LogoIco -Destination (Join-Path $FlintApp "icon.ico") -Force
 }
 
 $DesktopPackage = @"
@@ -221,8 +221,10 @@ $Shell = New-Object -ComObject WScript.Shell
 $Shortcut = $Shell.CreateShortcut($ShortcutFile)
 $Shortcut.TargetPath = $Launcher
 $Shortcut.WorkingDirectory = $FlintBin
-$IconPath = Join-Path $FlintApp "icon.png"
-if (Test-Path $IconPath) { $Shortcut.IconLocation = $IconPath }
+$IconIco = Join-Path $FlintApp "icon.ico"
+$IconPng = Join-Path $FlintApp "icon.png"
+if (Test-Path $IconIco) { $Shortcut.IconLocation = $IconIco }
+elseif (Test-Path $IconPng) { $Shortcut.IconLocation = $IconPng }
 $Shortcut.Description = "Flint local-first knowledge base with AI"
 $Shortcut.Save()
 
