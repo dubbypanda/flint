@@ -303,8 +303,8 @@ DESKTOP
     *":$FLINT_BIN:"*) ok "Command available as flint" ;;
     *)
       # Only add to .profile if not already there
-      if ! grep -q "$FLINT_BIN" "$HOME/.profile" 2>/dev/null; then
-        profile_file="$HOME/.profile"
+      profile_file="$HOME/.profile"
+      if ! grep -q '\.flint/bin' "$profile_file" 2>/dev/null; then
         printf '\n# Flint\nexport PATH="$HOME/.flint/bin:$PATH"\n' >> "$profile_file"
         warn "Added $FLINT_BIN to PATH in $profile_file. Open a new terminal or run: export PATH=\"$FLINT_BIN:\$PATH\""
       else
