@@ -3,8 +3,15 @@ Flint AI Agent — Local Python Agent with Ollama + Web Search + Note Memory
 Runs on http://localhost:5100
 """
 
-import json
+import sys
 import os
+
+if sys.stdout is None:
+    sys.stdout = open(os.devnull, "w")
+if sys.stderr is None:
+    sys.stderr = open(os.devnull, "w")
+
+import json
 import time
 import threading
 import requests

@@ -41,4 +41,4 @@ Write-Host "[2/2] Update complete"
 Write-Host ""
 Write-Host "Flint has been updated successfully." -ForegroundColor Green
 Write-Host "Run it from your Start Menu or with:"
-Write-Host "  $FlintHome\bin\flint.cmd"
+Write-Host ("  " + (Join-Path $FlintHome "bin\flint.cmd"))
