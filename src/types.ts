@@ -56,6 +56,8 @@ export interface FlintSettings {
   showLineNumbers: boolean;
   tabSize: number;
   wordWrap: boolean;
+  theme: 'dark' | 'light' | 'rose' | 'ocean' | 'forest' | 'amber';
+  editorStyle: 'split' | 'tiptap';
 }
 
 export interface ChatMessage {
@@ -76,16 +78,13 @@ export interface AIAction {
   content?: string;
 }
 
-export type AIProvider = 'ollama' | 'openai' | 'gemini' | 'openai-compatible' | 'local-gguf';
+export type AIProvider = 'ollama' | 'openai' | 'gemini' | 'openai-compatible';
 
 export interface AISettings {
   provider: AIProvider;
   ollamaUrl: string;
   apiKey: string;
   apiBaseUrl: string;
-  localModelPath: string;
-  localModelContext: number;
-  localModelThreads: number;
   maxOutputTokens: number;
   model: string;
   maxContextNotes: number;
@@ -114,4 +113,5 @@ export interface AppState {
   aiMessages: ChatMessage[];
   aiSettings: AISettings;
   hasFolderHandle: boolean; // whether current vault has a live folder handle
+  appSettings: FlintSettings;
 }

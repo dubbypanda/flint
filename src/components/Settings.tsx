@@ -3,51 +3,14 @@ import { useStore } from '../store';
 import { FlintLogo, FlintLogoLarge } from './FlintLogo';
 import { X, Type, Save, AlignLeft, Hash, WrapText, CheckSquare, Download, Upload, Trash2, Info, Brain, Wifi, WifiOff, RefreshCw, Globe, FolderOpen, FolderPlus } from 'lucide-react';
 import { fetchOllamaModels, checkOllamaStatus, checkAgentStatus } from '../services/ollama';
-import type { Note, Folder } from '../types';
-
-interface Settings {
-  fontSize: number;
-  spellCheck: boolean;
-  autoSave: boolean;
-  showLineNumbers: boolean;
-  tabSize: number;
-  wordWrap: boolean;
-  theme: 'dark' | 'light' | 'rose' | 'ocean' | 'forest' | 'amber';
-}
-
-const SETTINGS_KEY = 'flint-settings';
-const DEFAULT_SETTINGS: Settings = {
-  fontSize: 14, spellCheck: false, autoSave: true, showLineNumbers: false, tabSize: 2, wordWrap: true, theme: 'dark',
-};
-
-function loadSettings(): Settings {
-  try {
-    const raw = localStorage.getItem(SETTINGS_KEY);
-    if (raw) {
-      const parsed = JSON.parse(raw) as Partial<Settings> & { theme?: string };
-      const themeMap: Record<string, Settings['theme']> = {
-        graphite: 'dark',
-        sunset: 'amber',
-        ocean: 'ocean',
-        forest: 'forest',
-        dark: 'dark',
-        light: 'light',
-        rose: 'rose',
-        amber: 'amber',
-      };
-      return { ...DEFAULT_SETTINGS, ...parsed, theme: themeMap[parsed.theme || 'dark'] || 'dark' };
-    }
-  } catch { /* ignore */ }
-  return DEFAULT_SETTINGS;
-}
-
-function saveSettings(s: Settings) {
-  try { localStorage.setItem(SETTINGS_KEY, JSON.stringify(s)); } catch { /* ignore */ }
-}
+import type { Note, Folder, FlintSettings } from '../types';
 
 export function SettingsPanel() {
   const { state, dispatch } = useStore();
-  const [settings, setSettings] = useState<Settings>(loadSettings());
+  const settings = state.appSettings;
+  const setSettings = (updater: (s: FlintSettings) => FlintSettings) => {
+    dispatch({ type: 'UPDATE_SETTINGS', payload: updater(settings) });
+  };
   const [tab, setTab] = useState<'editor' | 'ai' | 'vault' | 'about'>('editor');
   const [models, setModels] = useState<string[]>([]);
   const [ollamaStatus, setOllamaStatus] = useState<'checking' | 'connected' | 'disconnected'>('checking');
@@ -55,12 +18,10 @@ export function SettingsPanel() {
   const [refreshing, setRefreshing] = useState(false);
   
   const isCredentialProvider = state.aiSettings.provider === 'openai' || state.aiSettings.provider === 'gemini' || state.aiSettings.provider === 'openai-compatible';
-  const isLocalProvider = state.aiSettings.provider === 'local-gguf';
   const isApiProvider = isCredentialProvider;
   const isOpenAICompatible = state.aiSettings.provider === 'openai-compatible';
-  const localModelLabel = state.aiSettings.localModelPath.split(/[\\/]/).pop() || 'model.gguf';
 
-  useEffect(() => { saveSettings(settings); }, [settings]);
+
 
   useEffect(() => {
     const style = document.getElementById('flint-dynamic-style');
@@ -352,7 +313,7 @@ export function SettingsPanel() {
                   id="theme-select"
                   value={settings.theme}
                   aria-label="Application theme"
-                  onChange={e => setSettings(s => ({ ...s, theme: e.target.value as Settings['theme'] }))}
+                  onChange={e => setSettings(s => ({ ...s, theme: e.target.value as FlintSettings['theme'] }))}
                   style={{ flex: 1, background: '#0d0d0d', border: '1px solid #1a1a1a', borderRadius: 4, padding: '5px 8px', color: '#aaa', fontSize: 12, outline: 'none' }}>
                   <option value="dark">Dark</option>
                   <option value="light">Light</option>
@@ -387,6 +348,18 @@ export function SettingsPanel() {
               <SettingRow icon={<AlignLeft size={14} />} label="Line numbers">
                 <Toggle checked={settings.showLineNumbers} onChange={v => setSettings(s => ({ ...s, showLineNumbers: v }))} />
               </SettingRow>
+              <SettingRow icon={<Type size={14} />} label="Editor Style">
+                <label htmlFor="editor-style-select" className="sr-only">Select editor style</label>
+                <select 
+                  id="editor-style-select"
+                  value={settings.editorStyle}
+                  aria-label="Editor Style"
+                  onChange={e => setSettings(s => ({ ...s, editorStyle: e.target.value as 'split' | 'tiptap' }))}
+                  style={{ flex: 1, background: '#0d0d0d', border: '1px solid #1a1a1a', borderRadius: 4, padding: '5px 8px', color: '#aaa', fontSize: 12, outline: 'none' }}>
+                  <option value="split">Classic (Split-pane)</option>
+                  <option value="tiptap">Tiptap (WYSIWYG)</option>
+                </select>
+              </SettingRow>
             </div>
           )}
 
@@ -417,10 +390,6 @@ export function SettingsPanel() {
                     ? `Agent running. Found ${models.length} model${models.length !== 1 ? 's' : ''}: ${models.slice(0, 3).join(', ')}${models.length > 3 ? '...' : ''}`
                     : state.aiSettings.provider === 'ollama' && ollamaStatus === 'disconnected'
                     ? 'Agent running but Ollama not found. Start with: ollama serve'
-                    : isLocalProvider
-                    ? state.aiSettings.localModelPath
-                      ? `Agent running. Flint will send prompts directly to the self-hosted GGUF runtime for ${localModelLabel}.`
-                      : 'Agent running. Set a local GGUF model path to use your downloaded model directly through the self-hosted agent.'
                     : state.aiSettings.provider === 'ollama'
                     ? 'Checking connection...'
                     : 'Agent running. Requests will use your selected API provider and key.'}
@@ -481,34 +450,15 @@ export function SettingsPanel() {
                 </SettingRow>
               )}
 
-              {isLocalProvider && (
-                <>
-                  <SettingRow icon={<FolderOpen size={14} />} label="GGUF model path">
-                    <input type="text" value={state.aiSettings.localModelPath}
-                      onChange={e => dispatch({ type: 'UPDATE_AI_SETTINGS', payload: { localModelPath: e.target.value } })}
-                      placeholder="/path/to/model.gguf"
-                      style={{ flex: 1, background: '#0d0d0d', border: '1px solid #1a1a1a', borderRadius: 4, padding: '5px 8px', color: '#aaa', fontSize: 12, outline: 'none' }} />
-                  </SettingRow>
-                  <SettingRow icon={<Hash size={14} />} label="Local context" value={`${state.aiSettings.localModelContext}`}>
-                    <input type="range" min={512} max={8192} step={256} value={state.aiSettings.localModelContext}
-                      onChange={e => dispatch({ type: 'UPDATE_AI_SETTINGS', payload: { localModelContext: parseInt(e.target.value) } })}
-                      style={{ flex: 1, accentColor: '#666' }} />
-                  </SettingRow>
-                  <SettingRow icon={<Hash size={14} />} label="Local threads" value={`${state.aiSettings.localModelThreads}`}>
-                    <input type="range" min={1} max={16} step={1} value={state.aiSettings.localModelThreads}
-                      onChange={e => dispatch({ type: 'UPDATE_AI_SETTINGS', payload: { localModelThreads: parseInt(e.target.value) } })}
-                      style={{ flex: 1, accentColor: '#666' }} />
-                  </SettingRow>
-                </>
-              )}
 
               <SettingRow icon={<Brain size={14} />} label="Model">
                 <div className="flex items-center gap-2" style={{ flex: 1 }}>
                   <select value={state.aiSettings.model}
                     onChange={e => dispatch({ type: 'UPDATE_AI_SETTINGS', payload: { model: e.target.value } })}
                     style={{ flex: 1, background: '#0d0d0d', border: '1px solid #1a1a1a', borderRadius: 4, padding: '5px 8px', color: '#aaa', fontSize: 12, outline: 'none' }}>
-                    <option value="llama3.2:latest">llama3.2:latest</option>
-                    {models.filter(m => m.includes('llama3.2') && m !== 'llama3.2:latest').map(m => <option key={m} value={m}>{m}</option>)}
+                    {models.length === 0
+                      ? <option value="">No models found — run: ollama pull</option>
+                      : models.map(m => <option key={m} value={m}>{m}</option>)}
                   </select>
                 </div>
               </SettingRow>
@@ -561,8 +511,7 @@ export function SettingsPanel() {
                 <div style={{ fontSize: 11, fontWeight: 600, color: '#555', marginBottom: 6 }}>How Flint AI works</div>
                 <div style={{ fontSize: 10, color: '#3a3a3a', lineHeight: 1.6 }}>
                   • Builds responses from your <strong style={{ color: '#555' }}>note memory + graph links</strong><br />
-                  • Works with <strong style={{ color: '#555' }}>Ollama, local GGUF files, OpenAI, Gemini, and OpenAI-compatible APIs</strong><br />
-                  • Use tiny local models (MB-scale GGUF) by setting a small model path + lower output tokens<br />
+                  • Works with <strong style={{ color: '#555' }}>Ollama, OpenAI, Gemini, and OpenAI-compatible APIs</strong><br />
                   • Paste your API key in settings when using cloud providers<br />
                   • Requests are routed through the local <strong style={{ color: '#555' }}>Python agent</strong><br />
                   • Uses your <strong style={{ color: '#555' }}>notes as memory</strong> — builds context from note content<br />

@@ -7,11 +7,12 @@ $InstallerUrl = "https://raw.githubusercontent.com/$RepoOwner/$RepoName/$RepoBra
 $FlintHome = if ($env:FLINT_HOME) { $env:FLINT_HOME } else { Join-Path $env:USERPROFILE ".flint" }
 
 Write-Host ""
-Write-Host "  ______   __       __   __   __   ______  " -ForegroundColor Cyan
-Write-Host " /\  ___\ /\ \     /\ \ /\ ""-""\-\ \ /\__  _\ " -ForegroundColor Cyan
-Write-Host " \ \  __\ \ \ \____\ \ \\ \ \-.  \ \/_/\ \/ " -ForegroundColor Cyan
-Write-Host "  \ \_\    \ \_____\ \_\ \ \_\""\_\   \ \_\ " -ForegroundColor Cyan
-Write-Host "   \/_/     \/_____/\/_/  \/_/ \/_/    \/_/ " -ForegroundColor Cyan
+Write-Host "███████╗██╗     ██╗███╗   ██╗████████╗ " -ForegroundColor Cyan
+Write-Host "██╔════╝██║     ██║████╗  ██║╚══██╔══╝ " -ForegroundColor Cyan
+Write-Host "█████╗  ██║     ██║██╔██╗ ██║   ██║    " -ForegroundColor Cyan
+Write-Host "██╔══╝  ██║     ██║██║╚██╗██║   ██║    " -ForegroundColor Cyan
+Write-Host "██║     ███████╗██║██║ ╚████║   ██║    " -ForegroundColor Cyan
+Write-Host "╚═╝     ╚══════╝╚═╝╚═╝  ╚═══╝   ╚═╝    " -ForegroundColor Cyan
 Write-Host ""
 
 if (-not (Test-Path (Join-Path $FlintHome "app"))) {
