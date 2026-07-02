@@ -37,16 +37,8 @@ have() { command -v "$1" >/dev/null 2>&1; }
 ask() {
   local prompt="$1"
   local default="$2"
-     local answer=""
-  
-   if [ ! -t 0 ]; then
-     answer="$default"
-   elif [ -r /dev/tty ]; then
-     read -r -p "      $prompt [$(if [ \"$default\" = \"y\" ]; then echo \"Y/n\"; else echo \"y/N\"; fi)]: " answer </dev/tty || answer="$default"
-   else
-     read -r -p "      $prompt [$(if [ \"$default\" = \"y\" ]; then echo \"Y/n\"; else echo \"y/N\"; fi)]: " answer || answer="$default"
-   fi
-   
+  local answer
+  read -p "      $prompt [$(if [ "$default" = "y" ]; then echo "Y/n"; else echo "y/N"; fi)]: " answer
   answer="${answer:-$default}"
   if [[ "$answer" =~ ^[Yy]$ ]]; then
     return 0
@@ -198,12 +190,15 @@ install_agent() {
     say "      Creating Python virtual environment..."
     "$PYTHON_CMD" -m venv "$FLINT_VENV" || { warn "Failed to create venv. Using system pip."; FLINT_VENV=""; }
     
-    say "      Installing agent requirements..."
-   "$FLINT_VENV/bin/pip" install -q -r "$FLINT_HOME/agent/requirements.txt" || warn "Python packages were not installed. Install requirements manually for AI."
+    local pip_cmd
+    if [ -n "$FLINT_VENV" ]; then
       pip_cmd="$FLINT_VENV/bin/pip"
     else
-     "$PYTHON_CMD" -m pip install --user -q -r "$FLINT_HOME/agent/requirements.txt" || warn "Python packages were not installed. Install requirements manually for AI."
+      pip_cmd="$PYTHON_CMD -m pip install --user"
     fi
+
+    say "      Installing agent requirements..."
+    $pip_cmd install -q -r "$FLINT_HOME/agent/requirements.txt" || warn "Python packages were not installed. Install requirements manually for AI."
     ok "Agent dependencies installed"
   fi
 }
@@ -303,8 +298,8 @@ DESKTOP
     *":$FLINT_BIN:"*) ok "Command available as flint" ;;
     *)
       # Only add to .profile if not already there
-      profile_file="$HOME/.profile"
-      if ! grep -q '\.flint/bin' "$profile_file" 2>/dev/null; then
+      if ! grep -q "$FLINT_BIN" "$HOME/.profile" 2>/dev/null; then
+        profile_file="$HOME/.profile"
         printf '\n# Flint\nexport PATH="$HOME/.flint/bin:$PATH"\n' >> "$profile_file"
         warn "Added $FLINT_BIN to PATH in $profile_file. Open a new terminal or run: export PATH=\"$FLINT_BIN:\$PATH\""
       else
