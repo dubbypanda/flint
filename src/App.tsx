@@ -20,27 +20,30 @@ import {
   Bold, Italic, Code, List, Link2, Heading2, Quote,
   Command, FolderPlus, Settings, Hash, Brackets, Brain, CalendarDays, LayoutGrid,
 } from 'lucide-react';
+import i18n from './i18n';
+import { useTranslation } from 'react-i18next';
 
 function CommandPalette() {
+  const { t } = useTranslation();
   const { dispatch, createNote, createFolder, openDailyNote } = useStore();
   const [query, setQuery] = useState('');
   const [idx, setIdx] = useState(0);
   const inputRef = useRef<HTMLInputElement>(null);
 
   const commands = [
-    { icon: <Plus size={14} />, label: 'New note', action: () => { createNote(); dispatch({ type: 'TOGGLE_COMMAND_PALETTE' }); } },
-    { icon: <CalendarDays size={14} />, label: 'Open daily note', action: () => { openDailyNote(); dispatch({ type: 'TOGGLE_COMMAND_PALETTE' }); } },
-    { icon: <FolderPlus size={14} />, label: 'New folder', action: () => { createFolder('New Folder'); dispatch({ type: 'TOGGLE_COMMAND_PALETTE' }); } },
-    { icon: <Waypoints size={14} />, label: 'Open graph view', action: () => { dispatch({ type: 'TOGGLE_GRAPH_VIEW' }); dispatch({ type: 'TOGGLE_COMMAND_PALETTE' }); } },
-    { icon: <LayoutGrid size={14} />, label: 'Open canvas', action: () => { dispatch({ type: 'TOGGLE_CANVAS_VIEW' }); dispatch({ type: 'TOGGLE_COMMAND_PALETTE' }); } },
-    { icon: <Search size={14} />, label: 'Search notes', action: () => { dispatch({ type: 'TOGGLE_SEARCH' }); dispatch({ type: 'TOGGLE_COMMAND_PALETTE' }); } },
-    { icon: <PenLine size={14} />, label: 'Switch to editor', action: () => { dispatch({ type: 'SET_VIEW_MODE', payload: 'edit' }); dispatch({ type: 'TOGGLE_COMMAND_PALETTE' }); } },
-    { icon: <Eye size={14} />, label: 'Switch to preview', action: () => { dispatch({ type: 'SET_VIEW_MODE', payload: 'preview' }); dispatch({ type: 'TOGGLE_COMMAND_PALETTE' }); } },
-    { icon: <Columns2 size={14} />, label: 'Switch to split view', action: () => { dispatch({ type: 'SET_VIEW_MODE', payload: 'split' }); dispatch({ type: 'TOGGLE_COMMAND_PALETTE' }); } },
-    { icon: <PanelLeftOpen size={14} />, label: 'Toggle sidebar', action: () => { dispatch({ type: 'TOGGLE_SIDEBAR' }); dispatch({ type: 'TOGGLE_COMMAND_PALETTE' }); } },
-    { icon: <PanelRightOpen size={14} />, label: 'Toggle right panel', action: () => { dispatch({ type: 'TOGGLE_RIGHT_PANEL' }); dispatch({ type: 'TOGGLE_COMMAND_PALETTE' }); } },
-    { icon: <Settings size={14} />, label: 'Open settings', action: () => { dispatch({ type: 'TOGGLE_SETTINGS' }); dispatch({ type: 'TOGGLE_COMMAND_PALETTE' }); } },
-    { icon: <Brain size={14} />, label: 'Open Flint AI', action: () => { dispatch({ type: 'TOGGLE_AI_CHAT' }); dispatch({ type: 'TOGGLE_COMMAND_PALETTE' }); } },
+    { icon: <Plus size={14} />, label: t('app.commands.newNote'), action: () => { createNote(); dispatch({ type: 'TOGGLE_COMMAND_PALETTE' }); } },
+    { icon: <CalendarDays size={14} />, label: t('app.commands.openDailyNote'), action: () => { openDailyNote(); dispatch({ type: 'TOGGLE_COMMAND_PALETTE' }); } },
+    { icon: <FolderPlus size={14} />, label: t('app.commands.newFolder'), action: () => { createFolder('New Folder'); dispatch({ type: 'TOGGLE_COMMAND_PALETTE' }); } },
+    { icon: <Waypoints size={14} />, label: t('app.commands.openGraphView'), action: () => { dispatch({ type: 'TOGGLE_GRAPH_VIEW' }); dispatch({ type: 'TOGGLE_COMMAND_PALETTE' }); } },
+    { icon: <LayoutGrid size={14} />, label: t('app.commands.openCanvas'), action: () => { dispatch({ type: 'TOGGLE_CANVAS_VIEW' }); dispatch({ type: 'TOGGLE_COMMAND_PALETTE' }); } },
+    { icon: <Search size={14} />, label: t('app.commands.searchNotes'), action: () => { dispatch({ type: 'TOGGLE_SEARCH' }); dispatch({ type: 'TOGGLE_COMMAND_PALETTE' }); } },
+    { icon: <PenLine size={14} />, label: t('app.commands.switchToEditor'), action: () => { dispatch({ type: 'SET_VIEW_MODE', payload: 'edit' }); dispatch({ type: 'TOGGLE_COMMAND_PALETTE' }); } },
+    { icon: <Eye size={14} />, label: t('app.commands.switchToPreview'), action: () => { dispatch({ type: 'SET_VIEW_MODE', payload: 'preview' }); dispatch({ type: 'TOGGLE_COMMAND_PALETTE' }); } },
+    { icon: <Columns2 size={14} />, label: t('app.commands.switchToSplitView'), action: () => { dispatch({ type: 'SET_VIEW_MODE', payload: 'split' }); dispatch({ type: 'TOGGLE_COMMAND_PALETTE' }); } },
+    { icon: <PanelLeftOpen size={14} />, label: t('app.commands.toggleSidebar'), action: () => { dispatch({ type: 'TOGGLE_SIDEBAR' }); dispatch({ type: 'TOGGLE_COMMAND_PALETTE' }); } },
+    { icon: <PanelRightOpen size={14} />, label: t('app.commands.toggleRightPanel'), action: () => { dispatch({ type: 'TOGGLE_RIGHT_PANEL' }); dispatch({ type: 'TOGGLE_COMMAND_PALETTE' }); } },
+    { icon: <Settings size={14} />, label: t('app.commands.openSettings'), action: () => { dispatch({ type: 'TOGGLE_SETTINGS' }); dispatch({ type: 'TOGGLE_COMMAND_PALETTE' }); } },
+    { icon: <Brain size={14} />, label: t('app.commands.openFlintAI'), action: () => { dispatch({ type: 'TOGGLE_AI_CHAT' }); dispatch({ type: 'TOGGLE_COMMAND_PALETTE' }); } },
   ];
 
   const filtered = query.trim() ? commands.filter(c => c.label.toLowerCase().includes(query.toLowerCase())) : commands;
@@ -61,7 +64,7 @@ function CommandPalette() {
         onClick={e => e.stopPropagation()}>
         <div style={{ display: 'flex', alignItems: 'center', gap: 8, padding: '10px 14px', borderBottom: '1px solid #1a1a1a' }}>
           <Command size={14} style={{ color: '#444' }} />
-          <input ref={inputRef} type="text" placeholder="Type a command..." value={query} onChange={e => setQuery(e.target.value)} onKeyDown={handleKey}
+          <input ref={inputRef} type="text" placeholder={t('app.commandPalettePlaceholder')} value={query} onChange={e => setQuery(e.target.value)} onKeyDown={handleKey}
             style={{ flex: 1, background: 'none', border: 'none', color: '#bbb', fontSize: 14, outline: 'none' }} />
         </div>
         <div style={{ maxHeight: 300, overflowY: 'auto' }}>
@@ -76,7 +79,7 @@ function CommandPalette() {
           ))}
         </div>
         <div style={{ padding: '6px 14px', borderTop: '1px solid #1a1a1a', fontSize: 10, color: '#333', display: 'flex', gap: 12 }}>
-          <span>↑↓ Navigate</span><span>↵ Execute</span><span>Esc Close</span>
+          <span>{t('app.navigate')}</span><span>{t('app.execute')}</span><span>{t('app.escClose')}</span>
         </div>
       </div>
     </div>
@@ -84,8 +87,13 @@ function CommandPalette() {
 }
 
 function AppContent() {
+  const { t } = useTranslation();
   const { state, dispatch, createNote, openDailyNote } = useStore();
   const { activeNoteId, viewMode, showGraphView, showCanvasView, showSearch, showCommandPalette, sidebarOpen, rightPanelOpen, activeVaultId, settingsOpen, showAIChat } = state;
+  
+  useEffect(() => {
+  i18n.changeLanguage(state.appSettings.language);
+}, [state.appSettings.language]);
 
   // Dynamic style tag for settings
   useEffect(() => {
@@ -140,21 +148,21 @@ function AppContent() {
             <FlintLogo size={18} />
           </button>
 
-          <RibbonBtn icon={<PanelLeftOpen size={16} />} active={sidebarOpen} onClick={() => dispatch({ type: 'TOGGLE_SIDEBAR' })} title="Toggle sidebar (Ctrl+\)" />
-          <RibbonBtn icon={<Search size={16} />} onClick={() => dispatch({ type: 'TOGGLE_SEARCH' })} title="Search (Ctrl+Shift+F)" />
-          <RibbonBtn icon={<Plus size={16} />} onClick={() => createNote()} title="New note (Ctrl+N)" />
-          <RibbonBtn icon={<CalendarDays size={16} />} onClick={() => openDailyNote()} title="Daily note (Ctrl+Shift+D)" />
-          <RibbonBtn icon={<Waypoints size={16} />} active={showGraphView} onClick={() => dispatch({ type: 'TOGGLE_GRAPH_VIEW' })} title="Graph view (Ctrl+G)" />
-          <RibbonBtn icon={<LayoutGrid size={16} />} active={showCanvasView} onClick={() => dispatch({ type: 'TOGGLE_CANVAS_VIEW' })} title="Canvas (Ctrl+Shift+C)" />
-          <RibbonBtn icon={<Command size={16} />} onClick={() => dispatch({ type: 'TOGGLE_COMMAND_PALETTE' })} title="Command palette (Ctrl+P)" />
-          <RibbonBtn icon={<Brain size={16} />} active={showAIChat} onClick={() => dispatch({ type: 'TOGGLE_AI_CHAT' })} title="Flint AI (Ctrl+J)" />
+          <RibbonBtn icon={<PanelLeftOpen size={16} />} active={sidebarOpen} onClick={() => dispatch({ type: 'TOGGLE_SIDEBAR' })} title={t('app.toolbar.toggleSidebar')} />
+          <RibbonBtn icon={<Search size={16} />} onClick={() => dispatch({ type: 'TOGGLE_SEARCH' })} title={t('app.toolbar.search')} />
+          <RibbonBtn icon={<Plus size={16} />} onClick={() => createNote()} title={t('app.toolbar.newNote')} />
+          <RibbonBtn icon={<CalendarDays size={16} />} onClick={() => openDailyNote()} title={t('app.toolbar.dailyNote')} />
+          <RibbonBtn icon={<Waypoints size={16} />} active={showGraphView} onClick={() => dispatch({ type: 'TOGGLE_GRAPH_VIEW' })} title={t('app.toolbar.graphView')} />
+          <RibbonBtn icon={<LayoutGrid size={16} />} active={showCanvasView} onClick={() => dispatch({ type: 'TOGGLE_CANVAS_VIEW' })} title={t('app.toolbar.canvas')} />
+          <RibbonBtn icon={<Command size={16} />} onClick={() => dispatch({ type: 'TOGGLE_COMMAND_PALETTE' })} title={t('app.toolbar.commandPalette')} />
+          <RibbonBtn icon={<Brain size={16} />} active={showAIChat} onClick={() => dispatch({ type: 'TOGGLE_AI_CHAT' })} title={t('app.toolbar.flintAI')} />
 
           <div className="flex-1" />
 
           <RibbonBtn icon={rightPanelOpen ? <PanelRightClose size={16} /> : <PanelRightOpen size={16} />} active={rightPanelOpen}
-            onClick={() => dispatch({ type: 'TOGGLE_RIGHT_PANEL' })} title="Toggle right panel" />
+            onClick={() => dispatch({ type: 'TOGGLE_RIGHT_PANEL' })} title={t('app.toolbar.toggleRightPanel')} />
           <RibbonBtn icon={<Settings size={16} />} active={settingsOpen}
-            onClick={() => dispatch({ type: 'TOGGLE_SETTINGS' })} title="Settings (Ctrl+,)" />
+            onClick={() => dispatch({ type: 'TOGGLE_SETTINGS' })} title={t('app.toolbar.settings')} />
         </div>
 
         {/* Sidebar */}
@@ -169,7 +177,7 @@ function AppContent() {
                   <div style={{ width: 56, height: 56, borderRadius: 14, background: 'var(--bg-elevated)', display: 'flex', alignItems: 'center', justifyContent: 'center', margin: '0 auto 16px', border: '1px solid var(--border-light)' }}>
                     <FlintLogo size={28} />
                   </div>
-                  <h2 style={{ fontSize: 16, fontWeight: 600, color: 'var(--text)', marginBottom: 8 }}>No note selected</h2>
+                  <h2 style={{ fontSize: 16, fontWeight: 600, color: 'var(--text)', marginBottom: 8 }}>{t('app.noNoteSelected')}</h2>
                   <p style={{ color: 'var(--text-secondary)', fontSize: 13, marginBottom: 20, maxWidth: 260, lineHeight: 1.5, margin: '0 auto 20px' }}>
                     Create a new note or select one from the sidebar.
                   </p>
@@ -177,7 +185,7 @@ function AppContent() {
                     <button onClick={() => createNote()}
                       className="flex items-center gap-2"
                       style={{ padding: '7px 14px', background: 'var(--accent)', color: 'var(--bg-deep)', border: 'none', cursor: 'pointer', borderRadius: 6, fontSize: 12, fontWeight: 600 }}>
-                      <Plus size={12} /> New Note
+                      <Plus size={12} /> {t('app.commands.newNote')}
                     </button>
                     <button onClick={() => dispatch({ type: 'TOGGLE_GRAPH_VIEW' })}
                       className="flex items-center gap-2"
@@ -198,9 +206,9 @@ function AppContent() {
                 <span style={{ fontSize: 13, fontWeight: 500, color: 'var(--text)', flex: 1 }}>{activeNote.title}</span>
                 <div className="flex items-center gap-1">
                   {state.appSettings.editorStyle !== 'tiptap' && ([
-                    { mode: 'edit' as const, icon: <PenLine size={13} />, label: 'Edit' },
-                    { mode: 'split' as const, icon: <Columns2 size={13} />, label: 'Split' },
-                    { mode: 'preview' as const, icon: <Eye size={13} />, label: 'Preview' },
+                    { mode: 'edit' as const, icon: <PenLine size={13} />, label: t('app.commands.edit') },
+                    { mode: 'split' as const, icon: <Columns2 size={13} />, label: t('app.commands.split') },
+                    { mode: 'preview' as const, icon: <Eye size={13} />, label: t('app.commands.preview') },
                   ]).map(v => (
                     <button key={v.mode} title={v.label}
                       className="flex items-center gap-1"

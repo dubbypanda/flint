@@ -1,8 +1,10 @@
 import { useState, useEffect, useRef } from 'react';
 import { useStore } from '../store';
 import { Search } from 'lucide-react';
+import { useTranslation } from 'react-i18next';
 
 export function SearchModal() {
+  const { t } = useTranslation();
   const { state, dispatch } = useStore();
   const [query, setQuery] = useState('');
   const [idx, setIdx] = useState(0);
@@ -26,19 +28,19 @@ export function SearchModal() {
         className="animate-scale-in" 
         role="dialog"
         aria-modal="true"
-        aria-label="Search notes"
+        aria-label={t('searchModal.searchNotesAria')}
         style={{ width: 480, background: '#0a0a0a', border: '1px solid #1a1a1a', borderRadius: 8, overflow: 'hidden', boxShadow: '0 8px 32px rgba(0,0,0,0.5)' }}
         onClick={e => e.stopPropagation()}>
         <div className="flex items-center gap-2" style={{ padding: '10px 14px', borderBottom: '1px solid #1a1a1a' }}>
           <Search size={14} style={{ color: '#444' }} aria-hidden="true" />
-          <label htmlFor="search-input" className="sr-only">Search all notes</label>
+          <label htmlFor="search-input" className="sr-only">{t('searchModal.title')}</label>
           <input 
             id="search-input"
             ref={inputRef} 
             type="text" 
-            placeholder="Search all notes..." 
+            placeholder={t('searchModal.placeholder')}
             value={query}
-            aria-label="Search query"
+            aria-label={t('searchModal.queryAria')}
             onChange={e => setQuery(e.target.value)}
             style={{ flex: 1, background: 'none', border: 'none', color: '#bbb', fontSize: 14, outline: 'none' }} />
         </div>
@@ -46,7 +48,7 @@ export function SearchModal() {
           id="search-results"
           style={{ maxHeight: 300, overflowY: 'auto' }}>
           {results.length === 0 && query.trim() && (
-            <div style={{ padding: '16px 14px', color: '#333', fontSize: 13 }}>No results found</div>
+            <div style={{ padding: '16px 14px', color: '#333', fontSize: 13 }}>{t('searchModal.noResults')}</div>
           )}
           {results.map((note) => (
             <div 
@@ -64,7 +66,7 @@ export function SearchModal() {
           ))}
         </div>
         <div style={{ padding: '6px 14px', borderTop: '1px solid #1a1a1a', fontSize: 10, color: '#333', display: 'flex', gap: 12 }} aria-hidden="true">
-          <span>↑↓ Navigate</span><span>↵ Open</span><span>Esc Close</span>
+          <span>↑↓ {t('searchModal.navigate')}</span><span>↵ {t('searchModal.open')}</span><span>{t('searchModal.escClose')}</span>
         </div>
       </div>
     </div>

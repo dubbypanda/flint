@@ -2,6 +2,7 @@ import { useEffect, useRef, useCallback, useState } from 'react';
 import { useStore } from '../store';
 import { FlintLogo } from './FlintLogo';
 import { X, ZoomIn, ZoomOut, RotateCcw, Play, Pause, Search, Palette } from 'lucide-react';
+import { useTranslation } from 'react-i18next';
 
 interface GNode { id: string; title: string; x: number; y: number; vx: number; vy: number; conns: number; group: string; }
 interface GEdge { from: string; to: string; }
@@ -11,6 +12,7 @@ function graphColorKey(vaultId: string | null) {
 }
 
 export function GraphView() {
+  const { t } = useTranslation();
   const { state, dispatch } = useStore();
   const canvasRef = useRef<HTMLCanvasElement>(null);
   const nodesRef = useRef<GNode[]>([]);
@@ -550,7 +552,7 @@ export function GraphView() {
       {/* Header */}
       <div className="flex items-center justify-between" style={{ position: 'absolute', top: 0, left: 0, right: 0, padding: '10px 16px', background: 'color-mix(in srgb, var(--bg-base) 92%, transparent)', borderBottom: '1px solid var(--border)', zIndex: 10 }}>
         <div className="flex items-center gap-3">
-          <button onClick={() => setShowSettings(!showSettings)} title="Settings"
+          <button onClick={() => setShowSettings(!showSettings)} title={t('graph.settings')}
             style={{ background: 'none', border: 'none', color: showSettings ? 'var(--text)' : 'var(--text-dim)', cursor: 'pointer', display: 'flex', padding: 0, transition: 'color 0.2s' }}
             onMouseEnter={e => { e.currentTarget.style.color = 'var(--text)'; }}
             onMouseLeave={e => { if (!showSettings) e.currentTarget.style.color = 'var(--text-dim)'; }}>
@@ -560,9 +562,9 @@ export function GraphView() {
             </svg>
           </button>
           <FlintLogo size={14} />
-          <span style={{ fontSize: 12, fontWeight: 600, color: 'var(--text-secondary)' }}>Graph View</span>
+          <span style={{ fontSize: 12, fontWeight: 600, color: 'var(--text-secondary)' }}>{t('graph.title')}</span>
           <span style={{ fontSize: 10, color: 'var(--text-dim)', background: 'var(--bg-surface)', padding: '2px 8px', borderRadius: 4, border: '1px solid var(--border)' }}>
-            {graphStats.nodes} nodes · {graphStats.edges} links
+            {t('graph.nodesAndLinks', { nodes: graphStats.nodes, edges: graphStats.edges })}
           </span>
         </div>
         <button onClick={() => dispatch({ type: 'TOGGLE_GRAPH_VIEW' })}
@@ -578,24 +580,24 @@ export function GraphView() {
         <div style={{ position: 'absolute', top: 48, left: 16, width: 260, background: 'color-mix(in srgb, var(--bg-surface) 96%, transparent)', border: '1px solid var(--border)', borderRadius: 8, padding: '12px 16px', zIndex: 10, maxHeight: 'calc(100vh - 100px)', overflowY: 'auto', backdropFilter: 'blur(8px)', boxShadow: '0 4px 20px rgba(0,0,0,0.4)' }}>
           
           <div style={{ marginBottom: 12 }}>
-            <div style={labelStyle}><span>Search</span></div>
+            <div style={labelStyle}><span>{t('graph.search')}</span></div>
             <div style={{ display: 'flex', alignItems: 'center', gap: 6, background: 'var(--bg-deep)', border: '1px solid var(--border)', borderRadius: 4, padding: '4px 8px' }}>
               <Search size={12} style={{ color: 'var(--text-dim)', flexShrink: 0 }} />
-              <input type="text" placeholder="Filter nodes..." value={filterQuery}
+              <input type="text" placeholder={t('graph.filterPlaceholder')} value={filterQuery}
                 onChange={e => setFilterQuery(e.target.value)}
                 style={{ background: 'none', border: 'none', color: 'var(--text)', fontSize: 11, outline: 'none', width: '100%' }} />
             </div>
           </div>
 
           <div style={{ marginBottom: 12 }}>
-            <div style={labelStyle}><span>Depth</span> <span>{depthFilter === 0 ? '∞' : depthFilter}</span></div>
+            <div style={labelStyle}><span>{t('graph.depth')}</span> <span>{depthFilter === 0 ? '∞' : depthFilter}</span></div>
             <input type="range" min={0} max={6} value={depthFilter}
               onChange={e => setDepthFilter(parseInt(e.target.value))}
               style={inputStyle} />
           </div>
 
           <div style={{ marginBottom: 12 }}>
-            <div style={labelStyle}><span>Line Visibility</span> <span>{Math.round(edgeOpacity * 100)}%</span></div>
+            <div style={labelStyle}><span>{t('graph.lineVisibility')}</span> <span>{Math.round(edgeOpacity * 100)}%</span></div>
             <input type="range" min={0.1} max={1} step={0.05} value={edgeOpacity}
               onChange={e => setEdgeOpacity(parseFloat(e.target.value))}
               style={inputStyle} />
@@ -604,42 +606,42 @@ export function GraphView() {
           <div style={{ marginBottom: 12 }}>
             <label style={{ display: 'flex', alignItems: 'center', gap: 6, fontSize: 10, color: 'var(--text-secondary)', cursor: 'pointer' }}>
               <input type="checkbox" checked={showAllLabels} onChange={e => setShowAllLabels(e.target.checked)} style={{ accentColor: 'var(--accent)' }} />
-              Show all titles
+              {t('graph.showAllTitles')}
             </label>
           </div>
 
           <div style={{ borderBottom: '1px solid var(--border)', margin: '8px 0' }}></div>
 
           <div style={{ marginBottom: 12 }}>
-            <div style={labelStyle}><span>Node Scale</span> <span>{nodeScale.toFixed(1)}</span></div>
+            <div style={labelStyle}><span>{t('graph.nodeScale')}</span> <span>{nodeScale.toFixed(1)}</span></div>
             <input type="range" min={0.5} max={4.0} step={0.1} value={nodeScale}
               onChange={e => setNodeScale(parseFloat(e.target.value))}
               style={inputStyle} />
           </div>
 
           <div style={{ marginBottom: 12 }}>
-            <div style={labelStyle}><span>Link Distance</span> <span>{linkDistance}px</span></div>
+            <div style={labelStyle}><span>{t('graph.linkDistance')}</span> <span>{linkDistance}px</span></div>
             <input type="range" min={100} max={600} step={10} value={linkDistance}
               onChange={e => setLinkDistance(parseInt(e.target.value))}
               style={inputStyle} />
           </div>
 
           <div style={{ marginBottom: 12 }}>
-            <div style={labelStyle}><span>Center Gravity</span> <span>{centerForce.toFixed(4)}</span></div>
+            <div style={labelStyle}><span>{t('graph.centerGravity')}</span> <span>{centerForce.toFixed(4)}</span></div>
             <input type="range" min={0.0005} max={0.0050} step={0.0001} value={centerForce}
               onChange={e => setCenterForce(parseFloat(e.target.value))}
               style={inputStyle} />
           </div>
 
           <div style={{ marginBottom: 12 }}>
-            <div style={labelStyle}><span>Group Pull</span> <span>{groupPull.toFixed(3)}</span></div>
+            <div style={labelStyle}><span>{t('graph.groupPull')}</span> <span>{groupPull.toFixed(3)}</span></div>
             <input type="range" min={0.001} max={0.015} step={0.001} value={groupPull}
               onChange={e => setGroupPull(parseFloat(e.target.value))}
               style={inputStyle} />
           </div>
 
           <div style={{ marginBottom: 12 }}>
-            <div style={labelStyle}><span>Group Spread</span> <span>{groupSpread}px</span></div>
+            <div style={labelStyle}><span>{t('graph.groupSpread')}</span> <span>{groupSpread}px</span></div>
             <input type="range" min={140} max={520} step={10} value={groupSpread}
               onChange={e => setGroupSpread(parseInt(e.target.value))}
               style={inputStyle} />
@@ -648,7 +650,7 @@ export function GraphView() {
           <div style={{ borderBottom: '1px solid var(--border)', margin: '8px 0' }}></div>
 
           <div style={{ marginBottom: 8 }}>
-            <div style={labelStyle}><span>Color Groups</span></div>
+            <div style={labelStyle}><span>{t('graph.colorGroups')}</span></div>
             <div style={{ display: 'flex', alignItems: 'center', gap: 6, background: 'var(--bg-deep)', border: '1px solid var(--border)', borderRadius: 4, padding: '4px 8px' }}>
               <Palette size={12} style={{ color: 'var(--text-dim)', flexShrink: 0 }} />
               <select value={selectedGroup} onChange={e => setSelectedGroup(e.target.value)} style={{ background: 'var(--bg-deep)', color: 'var(--text)', border: 'none', fontSize: 11, outline: 'none', width: '100%' }}>
@@ -673,7 +675,7 @@ export function GraphView() {
               onMouseEnter={e => e.currentTarget.style.opacity = '1'}
               onMouseLeave={e => e.currentTarget.style.opacity = '0.8'}
             >
-              Clear color
+              {t('graph.clearColor')}
             </button>
           </div>
 
@@ -685,7 +687,7 @@ export function GraphView() {
             onMouseEnter={e => { e.currentTarget.style.background = 'var(--bg-elevated)'; e.currentTarget.style.color = 'var(--text)'; }}
             onMouseLeave={e => { e.currentTarget.style.background = 'var(--bg-deep)'; e.currentTarget.style.color = 'var(--text-secondary)'; }}
           >
-            Burst Animation
+            {t('graph.burstAnimation')}
           </button>
         </div>
       )}
@@ -693,10 +695,10 @@ export function GraphView() {
       {/* Controls */}
       <div style={{ position: 'absolute', top: 48, right: 16, display: 'flex', flexDirection: 'column', gap: 2, background: 'color-mix(in srgb, var(--bg-surface) 92%, transparent)', border: '1px solid var(--border)', borderRadius: 8, padding: 4, zIndex: 10 }}>
         {[
-          { icon: <ZoomIn size={14} />, action: () => { zoomRef.current = Math.min(5, zoomRef.current + 0.2); }, title: 'Zoom in' },
-          { icon: <ZoomOut size={14} />, action: () => { zoomRef.current = Math.max(0.15, zoomRef.current - 0.2); }, title: 'Zoom out' },
-          { icon: <RotateCcw size={14} />, action: reset, title: 'Reset' },
-          { icon: physicsRef.current ? <Pause size={14} /> : <Play size={14} />, action: togglePhysics, title: physicsRef.current ? 'Pause physics' : 'Resume physics' },
+          { icon: <ZoomIn size={14} />, action: () => { zoomRef.current = Math.min(5, zoomRef.current + 0.2); }, title: t('graph.zoomIn') },
+          { icon: <ZoomOut size={14} />, action: () => { zoomRef.current = Math.max(0.15, zoomRef.current - 0.2); }, title: t('graph.zoomOut') },
+          { icon: <RotateCcw size={14} />, action: reset, title: t('graph.reset') },
+          { icon: physicsRef.current ? <Pause size={14} /> : <Play size={14} />, action: togglePhysics, title: physicsRef.current ? t('graph.pausePhysics') : t('graph.resumePhysics') },
         ].map((btn, i) => (
           <button key={i} onClick={btn.action} title={btn.title}
             style={{ width: 32, height: 32, background: 'none', border: 'none', color: 'var(--text-dim)', cursor: 'pointer', borderRadius: 6, display: 'flex', alignItems: 'center', justifyContent: 'center' }}

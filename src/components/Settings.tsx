@@ -4,8 +4,10 @@ import { FlintLogo, FlintLogoLarge } from './FlintLogo';
 import { X, Type, Save, AlignLeft, Hash, WrapText, CheckSquare, Download, Upload, Trash2, Info, Brain, Wifi, WifiOff, RefreshCw, Globe, FolderOpen, FolderPlus } from 'lucide-react';
 import { fetchOllamaModels, checkOllamaStatus, checkAgentStatus } from '../services/ollama';
 import type { Note, Folder, FlintSettings } from '../types';
+import { useTranslation, Trans } from 'react-i18next';
 
 export function SettingsPanel() {
+  const { t } = useTranslation();
   const { state, dispatch } = useStore();
   const settings = state.appSettings;
   const setSettings = (updater: (s: FlintSettings) => FlintSettings) => {
@@ -259,11 +261,11 @@ export function SettingsPanel() {
         <div className="flex items-center justify-between" style={{ padding: '14px 18px', borderBottom: '1px solid #303744', background: 'linear-gradient(180deg, #1e232b, #171b21)' }}>
           <div className="flex items-center gap-2">
             <FlintLogo size={14} />
-            <span style={{ fontSize: 14, fontWeight: 600, color: '#d5dbe5' }}>Settings</span>
+            <span style={{ fontSize: 14, fontWeight: 600, color: '#d5dbe5' }}>{t('settings.title')}</span>
           </div>
           <button 
             onClick={close} 
-            aria-label="Close settings"
+            aria-label={t('settings.closeAria')}
             style={{ background: 'none', border: 'none', color: '#768193', cursor: 'pointer', display: 'flex' }}
             onMouseEnter={e => { e.currentTarget.style.color = '#d2d8e2'; }}
             onMouseLeave={e => { e.currentTarget.style.color = '#768193'; }}>
@@ -273,19 +275,19 @@ export function SettingsPanel() {
 
         {/* Tabs */}
         <div className="flex" style={{ borderBottom: '1px solid #303744', background: '#161a20' }}>
-          {(['editor', 'ai', 'vault', 'about'] as const).map(t => (
-            <button 
-              key={t} 
-              onClick={() => setTab(t)}
-              aria-label={`${t === 'ai' ? 'AI' : t} settings`}
+          {(['editor', 'ai', 'vault', 'about'] as const).map(tb => (
+            <button
+              key={tb}
+              onClick={() => setTab(tb)}
+              aria-label={`${tb === 'ai' ? 'AI' : tb} settings`}
               style={{
                 flex: 1, padding: '10px', background: 'none', border: 'none', cursor: 'pointer',
                 fontSize: 12, fontWeight: 500, textTransform: 'capitalize',
-                color: tab === t ? '#d5dbe5' : '#7a8597',
-                borderBottom: tab === t ? '2px solid #93a4c0' : '2px solid transparent',
+                color: tab === tb ? '#d5dbe5' : '#7a8597',
+                borderBottom: tab === tb ? '2px solid #93a4c0' : '2px solid transparent',
                 transition: 'all 0.15s',
               }}>
-              {t === 'ai' ? 'AI' : t}
+              {tb === 'ai' ? 'AI' : tb}
             </button>
           ))}
         </div>
@@ -295,36 +297,49 @@ export function SettingsPanel() {
 
           {tab === 'editor' && (
             <div className="flex flex-col gap-5">
-              <SettingRow icon={<Type size={14} />} label="Font size" value={`${settings.fontSize}px`}>
-                <label htmlFor="font-size-slider" className="sr-only">Font size in pixels, between 10 and 24</label>
+              <SettingRow icon={<Type size={14} />} label={t('settings.fontSize')} value={`${settings.fontSize}px`}>
+                <label htmlFor="font-size-slider" className="sr-only">{t('settings.fontSizeHelp')}</label>
                 <input 
                   id="font-size-slider"
                   type="range" 
                   min={10} 
                   max={24} 
                   value={settings.fontSize}
-                  aria-label="Font size"
+                  aria-label={t('settings.fontSize')}
                   onChange={e => setSettings(s => ({ ...s, fontSize: parseInt(e.target.value) }))}
                   style={{ flex: 1, accentColor: '#666' }} />
               </SettingRow>
-              <SettingRow icon={<Type size={14} />} label="App theme">
-                <label htmlFor="theme-select" className="sr-only">Select application theme</label>
-                <select 
-                  id="theme-select"
-                  value={settings.theme}
-                  aria-label="Application theme"
-                  onChange={e => setSettings(s => ({ ...s, theme: e.target.value as FlintSettings['theme'] }))}
+              <SettingRow icon={<Globe size={14} />} label={t('settings.language')}>
+                <label htmlFor="lang-select" className="sr-only">{t('settings.language')}</label>
+                <select
+                  id="lang-select"
+                  value={settings.language}
+                  onChange={e => setSettings(s => ({ ...s, language: e.target.value as FlintSettings['language'] }))}
                   style={{ flex: 1, background: '#0d0d0d', border: '1px solid #1a1a1a', borderRadius: 4, padding: '5px 8px', color: '#aaa', fontSize: 12, outline: 'none' }}>
-                  <option value="dark">Dark</option>
-                  <option value="light">Light</option>
-                  <option value="rose">Rose</option>
-                  <option value="ocean">Ocean</option>
-                  <option value="forest">Forest</option>
-                  <option value="amber">Amber</option>
+                  <option value="en">English</option>
+                  <option value="de">Deutsch</option>
+                  <option value="fr">Français</option>
+                  <option value="ru">Русский</option>
                 </select>
               </SettingRow>
-              <SettingRow icon={<Hash size={14} />} label="Tab size" value={`${settings.tabSize}`}>
-                <label htmlFor="tab-size-slider" className="sr-only">Tab size in spaces, between 2 and 8</label>
+              <SettingRow icon={<Type size={14} />} label={t('settings.appTheme')}>
+                <label htmlFor="theme-select" className="sr-only">{t('settings.selectThemeLabel')}</label>
+                <select
+                  id="theme-select"
+                  value={settings.theme}
+                  aria-label={t('settings.themeAria')}
+                  onChange={e => setSettings(s => ({ ...s, theme: e.target.value as FlintSettings['theme'] }))}
+                  style={{ flex: 1, background: '#0d0d0d', border: '1px solid #1a1a1a', borderRadius: 4, padding: '5px 8px', color: '#aaa', fontSize: 12, outline: 'none' }}>
+                  <option value="dark">{t('settings.themeDark')}</option>
+                  <option value="light">{t('settings.themeLight')}</option>
+                  <option value="rose">{t('settings.themeRose')}</option>
+                  <option value="ocean">{t('settings.themeOcean')}</option>
+                  <option value="forest">{t('settings.themeForest')}</option>
+                  <option value="amber">{t('settings.themeAmber')}</option>
+                </select>
+              </SettingRow>
+              <SettingRow icon={<Hash size={14} />} label={t('settings.tabSize')} value={`${settings.tabSize}`}>
+                <label htmlFor="tab-size-slider" className="sr-only">{t('settings.tabSizeHelp')}</label>
                 <input 
                   id="tab-size-slider"
                   type="range" 
@@ -332,32 +347,32 @@ export function SettingsPanel() {
                   max={8} 
                   step={2} 
                   value={settings.tabSize}
-                  aria-label="Tab size"
+                  aria-label={t('settings.tabSize')}
                   onChange={e => setSettings(s => ({ ...s, tabSize: parseInt(e.target.value) }))}
                   style={{ flex: 1, accentColor: '#666' }} />
               </SettingRow>
-              <SettingRow icon={<WrapText size={14} />} label="Word wrap">
+              <SettingRow icon={<WrapText size={14} />} label={t('settings.wordWrap')}>
                 <Toggle checked={settings.wordWrap} onChange={v => setSettings(s => ({ ...s, wordWrap: v }))} />
               </SettingRow>
-              <SettingRow icon={<Save size={14} />} label="Auto-save">
+              <SettingRow icon={<Save size={14} />} label={t('settings.autoSave')}>
                 <Toggle checked={settings.autoSave} onChange={v => setSettings(s => ({ ...s, autoSave: v }))} />
               </SettingRow>
-              <SettingRow icon={<CheckSquare size={14} />} label="Spell check">
+              <SettingRow icon={<CheckSquare size={14} />} label={t('settings.spellCheck')}>
                 <Toggle checked={settings.spellCheck} onChange={v => setSettings(s => ({ ...s, spellCheck: v }))} />
               </SettingRow>
-              <SettingRow icon={<AlignLeft size={14} />} label="Line numbers">
+              <SettingRow icon={<AlignLeft size={14} />} label={t('settings.lineNumbers')}>
                 <Toggle checked={settings.showLineNumbers} onChange={v => setSettings(s => ({ ...s, showLineNumbers: v }))} />
               </SettingRow>
-              <SettingRow icon={<Type size={14} />} label="Editor Style">
-                <label htmlFor="editor-style-select" className="sr-only">Select editor style</label>
-                <select 
+              <SettingRow icon={<Type size={14} />} label={t('settings.editorStyle')}>
+                <label htmlFor="editor-style-select" className="sr-only">{t('settings.selectEditorStyle')}</label>
+                <select
                   id="editor-style-select"
                   value={settings.editorStyle}
-                  aria-label="Editor Style"
+                  aria-label={t('settings.editorStyle')}
                   onChange={e => setSettings(s => ({ ...s, editorStyle: e.target.value as 'split' | 'tiptap' }))}
                   style={{ flex: 1, background: '#0d0d0d', border: '1px solid #1a1a1a', borderRadius: 4, padding: '5px 8px', color: '#aaa', fontSize: 12, outline: 'none' }}>
-                  <option value="split">Classic (Split-pane)</option>
-                  <option value="tiptap">Tiptap (WYSIWYG)</option>
+                  <option value="split">{t('settings.editorClassic')}</option>
+                  <option value="tiptap">{t('settings.editorTiptap')}</option>
                 </select>
               </SettingRow>
             </div>
@@ -370,12 +385,12 @@ export function SettingsPanel() {
                 <div className="flex items-center justify-between" style={{ marginBottom: 8 }}>
                   <div className="flex items-center gap-2">
                     <Brain size={16} style={{ color: '#666' }} />
-                    <span style={{ fontSize: 13, fontWeight: 600, color: '#888' }}>AI Agent</span>
+                    <span style={{ fontSize: 13, fontWeight: 600, color: '#888' }}>{t('settings.aiAgent')}</span>
                   </div>
                   <div className="flex items-center gap-2">
                     <div className="flex items-center gap-1" style={{ fontSize: 10, color: agentUp ? '#5a5' : '#655' }}>
                       {agentUp ? <Wifi size={10} /> : <WifiOff size={10} />}
-                      {agentUp ? 'Agent Running' : 'Agent Down'}
+                      {agentUp ? t('settings.agentRunning') : t('settings.agentDown')}
                     </div>
                     <button onClick={checkConnection} style={{ padding: '5px 8px', background: '#141414', border: '1px solid #1a1a1a', borderRadius: 5, color: '#888', cursor: 'pointer', display: 'flex', alignItems: 'center', gap: 6, fontSize: 10 }}>
                       <RefreshCw size={12} className={refreshing ? 'animate-spin' : ''} />
@@ -385,18 +400,21 @@ export function SettingsPanel() {
                 </div>
                 <div style={{ fontSize: 11, color: '#95a1b3', lineHeight: 1.6 }}>
                   {!agentUp
-                    ? 'Agent offline. Use Check connection after starting your local agent.'
+                    ? t('settings.agentOffline')
                     : state.aiSettings.provider === 'ollama' && ollamaStatus === 'connected'
-                    ? `Agent running. Found ${models.length} model${models.length !== 1 ? 's' : ''}: ${models.slice(0, 3).join(', ')}${models.length > 3 ? '...' : ''}`
+                    ? t('settings.agentRunningOllama', { 
+                        count: models.length, 
+                        models: models.slice(0, 3).join(', ') 
+                      }) + (models.length > 3 ? '...' : '')
                     : state.aiSettings.provider === 'ollama' && ollamaStatus === 'disconnected'
-                    ? 'Agent running but Ollama not found. Start with: ollama serve'
+                    ? t('settings.agentRunningButOllamaDown')
                     : state.aiSettings.provider === 'ollama'
-                    ? 'Checking connection...'
-                    : 'Agent running. Requests will use your selected API provider and key.'}
+                    ? t('settings.checking')
+                    : t('settings.agentRunningApi')}
                 </div>
               </div>
 
-              <SettingRow icon={<Brain size={14} />} label="Provider">
+              <SettingRow icon={<Brain size={14} />} label={t('ai.provider')}>
                 <select value={state.aiSettings.provider}
                   onChange={e => dispatch({
                     type: 'UPDATE_AI_SETTINGS',
@@ -405,31 +423,31 @@ export function SettingsPanel() {
                     },
                   })}
                   style={{ flex: 1, background: '#0d0d0d', border: '1px solid #1a1a1a', borderRadius: 4, padding: '5px 8px', color: '#aaa', fontSize: 12, outline: 'none' }}>
-                  <option value="ollama">Ollama (local)</option>
+                  <option value="ollama">{t('common.ollamaLocal')}</option>
                 </select>
               </SettingRow>
 
               {state.aiSettings.provider === 'ollama' && (
-                <SettingRow icon={<Wifi size={14} />} label="Ollama URL">
-                  <label htmlFor="ollama-url" className="sr-only">Ollama server URL</label>
+                <SettingRow icon={<Wifi size={14} />} label={t('settings.ollamaUrl')}>
+                  <label htmlFor="ollama-url" className="sr-only">{t('settings.ollamaUrl')}</label>
                   <input 
                     id="ollama-url"
                     type="text" 
                     value={state.aiSettings.ollamaUrl}
-                    aria-label="Ollama URL"
+                    aria-label={t('settings.ollamaUrl')}
                     onChange={e => dispatch({ type: 'UPDATE_AI_SETTINGS', payload: { ollamaUrl: e.target.value } })}
                     style={{ flex: 1, background: '#0d0d0d', border: '1px solid #1a1a1a', borderRadius: 4, padding: '5px 8px', color: '#aaa', fontSize: 12, outline: 'none' }} />
                 </SettingRow>
               )}
 
               {isApiProvider && (
-                <SettingRow icon={<Brain size={14} />} label="API key">
-                  <label htmlFor="api-key" className="sr-only">API key for authentication</label>
+                <SettingRow icon={<Brain size={14} />} label={t('settings.apiKey')}>
+                  <label htmlFor="api-key" className="sr-only">{t('settings.apiKey')}</label>
                   <input 
                     id="api-key"
                     type="password" 
                     value={state.aiSettings.apiKey}
-                    aria-label="API key"
+                    aria-label={t('settings.apiKey')}
                     onChange={e => dispatch({ type: 'UPDATE_AI_SETTINGS', payload: { apiKey: e.target.value } })}
                     placeholder={state.aiSettings.provider === 'openai' ? 'sk-...' : state.aiSettings.provider === 'gemini' ? 'AIza...' : 'Paste provider key'}
                     style={{ flex: 1, background: '#0d0d0d', border: '1px solid #1a1a1a', borderRadius: 4, padding: '5px 8px', color: '#aaa', fontSize: 12, outline: 'none' }} />
@@ -437,13 +455,13 @@ export function SettingsPanel() {
               )}
 
               {isOpenAICompatible && (
-                <SettingRow icon={<Globe size={14} />} label="API base URL">
-                  <label htmlFor="api-base-url" className="sr-only">API base URL for the provider</label>
+                <SettingRow icon={<Globe size={14} />} label={t('settings.apiBaseUrl')}>
+                  <label htmlFor="api-base-url" className="sr-only">{t('settings.apiBaseUrlHelp')}</label>
                   <input 
                     id="api-base-url"
                     type="text" 
                     value={state.aiSettings.apiBaseUrl}
-                    aria-label="API base URL"
+                    aria-label={t('settings.apiBaseUrl')}
                     onChange={e => dispatch({ type: 'UPDATE_AI_SETTINGS', payload: { apiBaseUrl: e.target.value } })}
                     placeholder="https://api.provider.com/v1"
                     style={{ flex: 1, background: '#0d0d0d', border: '1px solid #1a1a1a', borderRadius: 4, padding: '5px 8px', color: '#aaa', fontSize: 12, outline: 'none' }} />
@@ -451,13 +469,13 @@ export function SettingsPanel() {
               )}
 
 
-              <SettingRow icon={<Brain size={14} />} label="Model">
+              <SettingRow icon={<Brain size={14} />} label={t('settings.model')}>
                 <div className="flex items-center gap-2" style={{ flex: 1 }}>
                   <select value={state.aiSettings.model}
                     onChange={e => dispatch({ type: 'UPDATE_AI_SETTINGS', payload: { model: e.target.value } })}
                     style={{ flex: 1, background: '#0d0d0d', border: '1px solid #1a1a1a', borderRadius: 4, padding: '5px 8px', color: '#aaa', fontSize: 12, outline: 'none' }}>
                     {models.length === 0
-                      ? <option value="">No models found — run: ollama pull</option>
+                      ? <option value="">{t('common.noModelsFound')}</option>
                       : models.map(m => <option key={m} value={m}>{m}</option>)}
                   </select>
                 </div>
@@ -470,7 +488,7 @@ export function SettingsPanel() {
                 <div className="flex items-center justify-between" style={{ marginBottom: 8 }}>
                   <div className="flex items-center gap-2">
                     <Globe size={16} style={{ color: state.aiSettings.internetAccess ? '#5a5' : '#444' }} />
-                    <span style={{ fontSize: 13, fontWeight: 600, color: '#888' }}>Internet Access</span>
+                    <span style={{ fontSize: 13, fontWeight: 600, color: '#888' }}>{t('settings.internetAccess')}</span>
                   </div>
                   <Toggle
                     checked={state.aiSettings.internetAccess}
@@ -479,26 +497,26 @@ export function SettingsPanel() {
                 </div>
                 <div style={{ fontSize: 11, color: '#444', lineHeight: 1.6 }}>
                   {state.aiSettings.internetAccess
-                    ? 'AI can search the web (Wikipedia) to supplement answers with real-time information.'
-                    : 'AI will only use your notes as context. Enable to allow web searches.'}
+                    ? t('settings.internetAccessOn')
+                    : t('settings.internetAccessOff')}
                 </div>
               </div>
 
               {/* Context notes */}
-              <SettingRow icon={<Hash size={14} />} label="Max context notes" value={`${state.aiSettings.maxContextNotes}`}>
+              <SettingRow icon={<Hash size={14} />} label={t('settings.maxContextNotes')} value={`${state.aiSettings.maxContextNotes}`}>
                 <input type="range" min={2} max={20} value={state.aiSettings.maxContextNotes}
                   onChange={e => dispatch({ type: 'UPDATE_AI_SETTINGS', payload: { maxContextNotes: parseInt(e.target.value) } })}
                   style={{ flex: 1, accentColor: '#666' }} />
               </SettingRow>
 
               {/* Temperature */}
-              <SettingRow icon={<AlignLeft size={14} />} label="Temperature" value={state.aiSettings.temperature.toFixed(2)}>
+              <SettingRow icon={<AlignLeft size={14} />} label={t('settings.temperature')} value={state.aiSettings.temperature.toFixed(2)}>
                 <input type="range" min={0} max={200} value={Math.round(state.aiSettings.temperature * 100)}
                   onChange={e => dispatch({ type: 'UPDATE_AI_SETTINGS', payload: { temperature: parseInt(e.target.value) / 100 } })}
                   style={{ flex: 1, accentColor: '#666' }} />
               </SettingRow>
 
-              <SettingRow icon={<Hash size={14} />} label="Max output tokens" value={`${state.aiSettings.maxOutputTokens}`}>
+              <SettingRow icon={<Hash size={14} />} label={t('settings.maxOutputTokens')} value={`${state.aiSettings.maxOutputTokens}`}>
                 <input type="range" min={64} max={1024} step={32} value={state.aiSettings.maxOutputTokens}
                   onChange={e => dispatch({ type: 'UPDATE_AI_SETTINGS', payload: { maxOutputTokens: parseInt(e.target.value) } })}
                   style={{ flex: 1, accentColor: '#666' }} />
@@ -508,17 +526,17 @@ export function SettingsPanel() {
 
               {/* How it works */}
               <div style={{ padding: 12, background: '#060606', borderRadius: 6, border: '1px solid #151515' }}>
-                <div style={{ fontSize: 11, fontWeight: 600, color: '#555', marginBottom: 6 }}>How Flint AI works</div>
+                <div style={{ fontSize: 11, fontWeight: 600, color: '#555', marginBottom: 6 }}>{t('settings.howItWorksTitle')}</div>
                 <div style={{ fontSize: 10, color: '#3a3a3a', lineHeight: 1.6 }}>
-                  • Builds responses from your <strong style={{ color: '#555' }}>note memory + graph links</strong><br />
-                  • Works with <strong style={{ color: '#555' }}>Ollama, OpenAI, Gemini, and OpenAI-compatible APIs</strong><br />
-                  • Paste your API key in settings when using cloud providers<br />
-                  • Requests are routed through the local <strong style={{ color: '#555' }}>Python agent</strong><br />
-                  • Uses your <strong style={{ color: '#555' }}>notes as memory</strong> — builds context from note content<br />
-                  • Follows <strong style={{ color: '#555' }}>graph connections</strong> — linked notes provide deeper context<br />
-                  • <strong style={{ color: '#555' }}>Internet access</strong> — searches Wikipedia for real-time information<br />
-                  • You can still run <strong style={{ color: '#555' }}>100% local</strong> with Ollama only<br />
-                  • Install local models: <code style={{ background: '#111', padding: '1px 4px', borderRadius: 2 }}>ollama pull llama3.2</code>
+                  • {t('settings.buildsResponsesFrom')}<strong style={{ color: '#555' }}>{t('settings.noteMemoryGraph')}</strong><br />
+                  • {t('settings.worksWith')}<strong style={{ color: '#555' }}>{t('settings.supportedProviders')}</strong><br />
+                  • {t('settings.pasteApiKey')}<br />
+                  • {t('settings.requestsRoutedThrough')}<strong style={{ color: '#555' }}>Python agent</strong><br />
+                  • {t('settings.usesYourNotesAsMemory')}<strong style={{ color: '#555' }}>{t('settings.notesAsMemory')}</strong>{t('settings.notesAsMemoryDesc')}<br />
+                  • {t('settings.followsGraphConnections')}<strong style={{ color: '#555' }}>{t('settings.graphConnections')}</strong>{t('settings.graphConnectionsDesc')}<br />
+                  • <strong style={{ color: '#555' }}>{t('settings.internetAccess')}</strong>{t('settings.internetAccessDesc')}<br />
+                  • {t('settings.stillRun')}<strong style={{ color: '#555' }}>{t('settings.fullyLocal')}</strong>{t('settings.fullyLocalDesc')}<br />
+                  • {t('settings.Install local models')}<code style={{ background: '#111', padding: '1px 4px', borderRadius: 2 }}>{t('settings.ollamaPull')}</code>
                 </div>
               </div>
             </div>
@@ -528,7 +546,7 @@ export function SettingsPanel() {
             <div className="flex flex-col gap-5">
               {/* Current vault info */}
               <div style={{ padding: 14, background: '#0d0d0d', borderRadius: 8, border: '1px solid #1a1a1a' }}>
-                <div style={{ fontSize: 12, color: '#666', marginBottom: 6 }}>Current Vault</div>
+                <div style={{ fontSize: 12, color: '#666', marginBottom: 6 }}>{t('settings.currentVault')}</div>
                 <div style={{ fontSize: 15, fontWeight: 600, color: '#aaa', marginBottom: 10 }}>{vault?.name || 'None'}</div>
                 {vault?.isFolderVault && vault.folderPath && (
                   <div style={{ fontSize: 10, color: '#444', marginBottom: 8, padding: '4px 8px', background: '#080808', borderRadius: 4, border: '1px solid #151515', wordBreak: 'break-all' }}>
@@ -536,9 +554,9 @@ export function SettingsPanel() {
                   </div>
                 )}
                 <div className="flex gap-4" style={{ fontSize: 11, color: '#444' }}>
-                  <span>{noteCount} notes</span>
-                  <span>{folderCount} folders</span>
-                  <span>{totalLinks} links</span>
+                  <span>{noteCount} {t('settings.notes')}</span>
+                  <span>{folderCount} {t('settings.folders')}</span>
+                  <span>{totalLinks} {t('settings.links')}</span>
                 </div>
               </div>
 
@@ -546,16 +564,15 @@ export function SettingsPanel() {
               <div style={{ padding: 14, background: '#0d0d0d', borderRadius: 8, border: '1px solid #1a1a1a' }}>
                 <div className="flex items-center gap-2" style={{ marginBottom: 8 }}>
                   <FolderOpen size={16} style={{ color: '#666' }} />
-                  <span style={{ fontSize: 13, fontWeight: 600, color: '#888' }}>Open Folder as Vault</span>
+                  <span style={{ fontSize: 13, fontWeight: 600, color: '#888' }}>{t('settings.openFolderAsVault')}</span>
                 </div>
                 <div style={{ fontSize: 11, color: '#444', lineHeight: 1.6, marginBottom: 10 }}>
-                  Select a folder from your system. All <code style={{ background: '#111', padding: '1px 4px', borderRadius: 2 }}>.md</code> files
-                  inside will be imported as notes. Subfolders become Flint folders. Changes save back to disk.
+                  {t('settings.selectFolder')} <code style={{ background: '#111', padding: '1px 4px', borderRadius: 2 }}>.md</code> {t('settings.mdFiles')}
                 </div>
                 <button onClick={openFolderAsVault}
                   className="flex items-center gap-2"
                   style={{ padding: '10px 14px', background: '#111', border: '1px solid #222', borderRadius: 6, color: '#999', cursor: 'pointer', fontSize: 12, width: '100%', textAlign: 'left' }}>
-                  <FolderOpen size={14} /> Choose Folder...
+                  <FolderOpen size={14} /> {t('settings.chooseFolder')}
                 </button>
               </div>
 
@@ -563,58 +580,58 @@ export function SettingsPanel() {
               <div style={{ padding: 14, background: '#0d0d0d', borderRadius: 8, border: '1px solid #1a1a1a' }}>
                 <div className="flex items-center gap-2" style={{ marginBottom: 8 }}>
                   <FolderPlus size={16} style={{ color: '#666' }} />
-                  <span style={{ fontSize: 13, fontWeight: 600, color: '#888' }}>Import Markdown Files</span>
+                  <span style={{ fontSize: 13, fontWeight: 600, color: '#888' }}>{t('settings.importMarkdown')}</span>
                 </div>
                 <div style={{ fontSize: 11, color: '#444', lineHeight: 1.6, marginBottom: 10 }}>
-                  Select multiple <code style={{ background: '#111', padding: '1px 4px', borderRadius: 2 }}>.md</code> files from your system
-                  to import into the current vault.
+                  {t('settings.selectmult')}<code style={{ background: '#111', padding: '1px 4px', borderRadius: 2 }}>.md</code>{t('settings.mdFiles2')}
                 </div>
                 <button onClick={importMarkdownFiles}
                   className="flex items-center gap-2"
                   style={{ padding: '10px 14px', background: '#111', border: '1px solid #222', borderRadius: 6, color: '#999', cursor: 'pointer', fontSize: 12, width: '100%', textAlign: 'left' }}>
-                  <FolderPlus size={14} /> Select Files...
+                  <FolderPlus size={14} /> {t('settings.selectFiles')}
                 </button>
               </div>
 
               {/* Data management */}
               <div className="flex flex-col gap-2">
-                <div style={{ fontSize: 11, fontWeight: 600, color: '#555', marginBottom: 4 }}>Data Management</div>
+                <div style={{ fontSize: 11, fontWeight: 600, color: '#555', marginBottom: 4 }}>{t('settings.dataManagement')}</div>
                 <button onClick={exportData}
                   className="flex items-center gap-2"
                   style={{ padding: '10px 14px', background: '#0d0d0d', border: '1px solid #1a1a1a', borderRadius: 6, color: '#777', cursor: 'pointer', fontSize: 12, textAlign: 'left', width: '100%' }}>
-                  <Download size={14} /> Export vault data
+                  <Download size={14} /> {t('settings.exportVaultData')}
                 </button>
                 <button onClick={importData}
                   className="flex items-center gap-2"
                   style={{ padding: '10px 14px', background: '#0d0d0d', border: '1px solid #1a1a1a', borderRadius: 6, color: '#777', cursor: 'pointer', fontSize: 12, textAlign: 'left', width: '100%' }}>
-                  <Upload size={14} /> Import vault data (.json)
+                  <Upload size={14} /> {t('settings.importVaultData')}
                 </button>
                 <button onClick={clearAll}
                   className="flex items-center gap-2"
                   style={{ padding: '10px 14px', background: '#0d0d0d', border: '1px solid #1a1a1a', borderRadius: 6, color: '#664444', cursor: 'pointer', fontSize: 12, textAlign: 'left', width: '100%' }}>
-                  <Trash2 size={14} /> Clear all data
+                  <Trash2 size={14} /> {t('settings.clearAllData')}
                 </button>
               </div>
             </div>
           )}
 
-          {tab === 'about' && (
+          {tab === t('about') && (
             <div className="flex flex-col gap-4" style={{ textAlign: 'center', paddingTop: 20 }}>
               <div style={{ width: 56, height: 56, borderRadius: 14, margin: '0 auto', border: '1px solid #1a1a1a', background: '#0a0a0a', display: 'flex', alignItems: 'center', justifyContent: 'center' }}>
                 <FlintLogoLarge size={28} />
               </div>
               <div>
-                <div style={{ fontSize: 18, fontWeight: 700, color: '#999' }}>Flint</div>
-                <div style={{ fontSize: 11, color: '#444', marginTop: 4 }}>Version 2.0.2</div>
+                <div style={{ fontSize: 18, fontWeight: 700, color: '#999' }}>{t('settings.aboutName')}</div>
+                <div style={{ fontSize: 11, color: '#444', marginTop: 4 }}>{t('settings.version')}</div>
               </div>
               <div style={{ fontSize: 12, color: '#555', lineHeight: 1.6, maxWidth: 340, margin: '0 auto' }}>
-                A secure, local-first knowledge base<br />with AI-powered memory.<br />
-                All data stays on your device. No cloud. No tracking.<br />
-                AI powered by <strong>Ollama</strong> — works with any model.
+                <Trans 
+                i18nKey="settings.aboutDescription"
+                components={{ strong: <strong /> }}
+                />
               </div>
               <div style={{ fontSize: 10, color: '#333', marginTop: 8 }}>
                 <Info size={10} style={{ display: 'inline', marginRight: 4 }} />
-                Built with React, Vite & TypeScript · AI by Ollama
+                {t('settings.aboutFooter')}
               </div>
             </div>
           )}
