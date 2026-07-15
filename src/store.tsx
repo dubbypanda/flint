@@ -18,7 +18,7 @@ const DEFAULT_AI_SETTINGS: AISettings = {
 };
 
 const DEFAULT_SETTINGS: FlintSettings = {
-  fontSize: 14, spellCheck: false, autoSave: true, showLineNumbers: false, tabSize: 2, wordWrap: true, theme: 'dark', editorStyle: 'split'
+  fontSize: 14, spellCheck: false, autoSave: true, showLineNumbers: false, tabSize: 2, wordWrap: true, theme: 'dark', editorStyle: 'split', language: 'en',
 };
 
 function normalizeSettings(raw: unknown): FlintSettings {

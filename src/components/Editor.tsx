@@ -1,8 +1,10 @@
 import { useRef, useEffect, useCallback } from 'react';
 import { useStore } from '../store';
 import { getHandle, writeMarkdownFile } from '../services/filesystem';
+import { useTranslation } from 'react-i18next';
 
 export function Editor({ noteId }: { noteId: string }) {
+  const { t } = useTranslation();
   const { state, dispatch } = useStore();
   const note = state.notes.find(n => n.id === noteId);
   const taRef = useRef<HTMLTextAreaElement>(null);
@@ -205,7 +207,7 @@ export function Editor({ noteId }: { noteId: string }) {
       onKeyDown={handleKey}
       onDragOver={handleDragOver}
       onDrop={handleDrop}
-      placeholder="Start writing..."
+      placeholder={t('editor.startWriting')}
       spellCheck={false}
       style={{ boxShadow: 'inset 0 1px 0 rgba(255,255,255,0.02)' }}
     />

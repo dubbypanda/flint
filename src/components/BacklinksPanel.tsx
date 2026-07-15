@@ -1,7 +1,9 @@
 import { useStore } from '../store';
 import { ArrowLeft, ArrowRight } from 'lucide-react';
+import { useTranslation } from 'react-i18next';
 
 export function BacklinksPanel({ noteId }: { noteId: string }) {
+  const { t } = useTranslation();
   const { state, dispatch, getBacklinks, getOutgoingLinks } = useStore();
   const note = state.notes.find(n => n.id === noteId);
   const backlinks = getBacklinks(noteId);
@@ -33,7 +35,7 @@ export function BacklinksPanel({ noteId }: { noteId: string }) {
       {/* Outline */}
       {headings.length > 0 && (
         <div style={{ padding: '12px 12px 8px' }}>
-          <div style={{ fontSize: 10, fontWeight: 600, color: '#333', textTransform: 'uppercase', letterSpacing: '0.06em', marginBottom: 6 }}>Outline</div>
+          <div style={{ fontSize: 10, fontWeight: 600, color: '#333', textTransform: 'uppercase', letterSpacing: '0.06em', marginBottom: 6 }}>{t('backlinks.outline')}</div>
           {headings.map((h, i) => (
             <div key={i} style={{ paddingLeft: (h.level - 1) * 10, fontSize: 11, color: '#555', padding: '2px 0', overflow: 'hidden', textOverflow: 'ellipsis', whiteSpace: 'nowrap' as const }}>
               {h.text}
@@ -47,7 +49,7 @@ export function BacklinksPanel({ noteId }: { noteId: string }) {
         <div style={{ fontSize: 10, fontWeight: 600, color: '#333', textTransform: 'uppercase', letterSpacing: '0.06em', marginBottom: 6 }}>
           Backlinks ({backlinks.length})
         </div>
-        {backlinks.length === 0 && <div style={{ fontSize: 11, color: '#333' }}>No backlinks yet</div>}
+        {backlinks.length === 0 && <div style={{ fontSize: 11, color: '#333' }}>{t('backlinks.noBacklinks')}</div>}
         {backlinks.map(n => <LinkItem key={n.id} n={n} icon={<ArrowLeft size={11} style={{ color: '#333' }} />} />)}
       </div>
 
@@ -56,7 +58,7 @@ export function BacklinksPanel({ noteId }: { noteId: string }) {
         <div style={{ fontSize: 10, fontWeight: 600, color: '#333', textTransform: 'uppercase', letterSpacing: '0.06em', marginBottom: 6 }}>
           Outgoing ({outgoing.length})
         </div>
-        {outgoing.length === 0 && <div style={{ fontSize: 11, color: '#333' }}>No outgoing links</div>}
+        {outgoing.length === 0 && <div style={{ fontSize: 11, color: '#333' }}>{t('backlinks.noOutgoing')}</div>}
         {outgoing.map(n => <LinkItem key={n.id} n={n} icon={<ArrowRight size={11} style={{ color: '#333' }} />} />)}
       </div>
     </div>

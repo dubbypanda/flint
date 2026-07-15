@@ -1,7 +1,9 @@
 import { useStore } from '../store';
 import { X } from 'lucide-react';
+import { useTranslation } from 'react-i18next';
 
 export function TabBar() {
+  const { t } = useTranslation();
   const { state, dispatch } = useStore();
 
   if (state.openTabs.length === 0) return null;
@@ -20,7 +22,7 @@ export function TabBar() {
               {note.title}
             </span>
             <button 
-              aria-label={`Close tab: ${note.title}`}
+              aria-label={t('tabBar.closeTab', { title: note.title })}
               onClick={e => { e.stopPropagation(); dispatch({ type: 'CLOSE_TAB', payload: tabId }); }}
               style={{ background: 'none', border: 'none', color: 'var(--text-dim)', cursor: 'pointer', padding: 2, display: 'flex', borderRadius: 4 }}
               onMouseEnter={e => { e.currentTarget.style.color = 'var(--text)'; e.currentTarget.style.background = 'var(--bg-hover)'; }}

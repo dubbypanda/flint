@@ -4,8 +4,10 @@ import { askFlintAI, fetchOllamaModels, checkOllamaStatus, checkAgentStatus } fr
 import { FlintLogo } from './FlintLogo';
 import { X, Send, Trash2, User, Loader2, Settings, Wifi, Globe, Brain, BookOpen, Network, Sparkles, Zap, Cpu, Server, AlertTriangle } from 'lucide-react';
 import type { AIAction } from '../types';
+import { useTranslation } from 'react-i18next';
 
 export function AIChat() {
+  const { t } = useTranslation();
   const { state, dispatch } = useStore();
   const [input, setInput] = useState('');
   const [isStreaming, setIsStreaming] = useState(false);
@@ -107,18 +109,18 @@ export function AIChat() {
       const targetLabel = noteId ? notes.find(note => note.id === noteId)?.title || 'note' : 'note';
       const requiresOpenTarget = action.type !== 'create_note';
       if (requiresOpenTarget && (!noteId || !editableIds.has(noteId))) {
-        summaries.push(`Blocked ${action.type.replace('_', ' ')} for "${targetLabel}" because only open notes are editable`);
+        summaries.push(t('ai.actionBlocked', { action: action.type.replace('_', ' '), title: targetLabel }));
         return;
       }
       if (action.type === 'rename_note') {
         if (!noteId || !action.title) return;
         dispatch({ type: 'RENAME_NOTE', payload: { id: noteId, title: action.title } });
-        summaries.push(`Renamed note to "${action.title}"`);
+        summaries.push(t('ai.actionRenamed', { title: action.title }));
       }
       if (action.type === 'update_note') {
         if (!noteId || !action.content) return;
         dispatch({ type: 'UPDATE_NOTE', payload: { id: noteId, content: action.content } });
-        summaries.push('Updated note content');
+        summaries.push(t('ai.actionUpdated'));
       }
       if (action.type === 'create_note' && action.title) {
         const newNote = {
@@ -131,12 +133,12 @@ export function AIChat() {
           updatedAt: Date.now(),
         };
         dispatch({ type: 'ADD_NOTE', payload: newNote });
-        summaries.push(`Created note "${action.title}"`);
+        summaries.push(t('ai.actionCreated', { title: action.title }));
       }
       if (action.type === 'delete_note') {
         if (!noteId) return;
         dispatch({ type: 'DELETE_NOTE', payload: noteId });
-        summaries.push('Deleted a note');
+        summaries.push(t('ai.actionDeleted'));
       }
     });
     return summaries;
@@ -181,7 +183,7 @@ export function AIChat() {
       (fullContent, webResults, usedOllama, actions) => {
         if (abortRef.current) return;
         const actionSummaries = actions?.length ? applyAIActions(actions) : [];
-        const actionSuffix = actionSummaries.length ? `\n\nChanges: ${actionSummaries.join('; ')}.` : '';
+        const actionSuffix = actionSummaries.length ? '\n\n' + t('ai.changes', { summary: actionSummaries.join('; ') }) : '';
         const assistantMsg = {
           id: Math.random().toString(36).slice(2) + Date.now().toString(36),
           role: 'assistant' as const,
@@ -222,7 +224,7 @@ export function AIChat() {
       const partial = {
         id: Math.random().toString(36).slice(2) + Date.now().toString(36),
         role: 'assistant' as const,
-        content: streamContent + '\n\n*[Generation stopped]*',
+        content: streamContent + '\n\n' + t('ai.generationStopped'),
         timestamp: Date.now(),
       };
       dispatch({ type: 'ADD_AI_MESSAGE', payload: partial });
@@ -256,23 +258,24 @@ export function AIChat() {
           <FlintLogo size={16} />
         </div>
         <div style={{ flex: 1 }}>
-          <div style={{ fontSize: 12, fontWeight: 600, color: '#d5dbe5' }}>Flint AI</div>
+          <div style={{ fontSize: 12, fontWeight: 600, color: '#d5dbe5' }}>{t('ai.title')}</div>
           <div className="flex items-center gap-1" style={{ fontSize: 10, color: isConfiguredMode ? '#9fc59d' : isAgentMode ? '#d0b08a' : '#bf8d8d' }}>
             {isConfiguredMode ? <Wifi size={8} /> : isAgentMode ? <Server size={8} /> : <Cpu size={8} />}
             {isOllamaMode
-              ? `Ollama · ${aiSettings.model}`
+              ? t('ai.statusOllama', { model: aiSettings.model })
               : isCloudMode
-              ? `${providerName} · ${aiSettings.model}`
+              ? t('ai.statusCloud', { provider: providerName, model: aiSettings.model })
               : isAgentMode
-              ? `${providerName} not configured`
-              : 'Browser mode'}
+              ? t('ai.statusAgentNotConfigured', { provider: providerName })
+              : t('ai.statusBrowser')
+            }
           </div>
         </div>
-        <button onClick={() => setShowConfig(!showConfig)} title="AI Settings"
+        <button onClick={() => setShowConfig(!showConfig)} title={t('ai.settings')}
           style={{ background: 'none', border: 'none', color: showConfig ? '#c6cfdb' : '#758091', cursor: 'pointer', display: 'flex', padding: 4 }}>
           <Settings size={14} />
         </button>
-        <button onClick={() => dispatch({ type: 'TOGGLE_AI_CHAT' })} title="Close"
+        <button onClick={() => dispatch({ type: 'TOGGLE_AI_CHAT' })} title={t('ai.aiClose')}
           style={{ background: 'none', border: 'none', color: '#758091', cursor: 'pointer', display: 'flex', padding: 4 }}>
           <X size={14} />
         </button>
@@ -286,10 +289,10 @@ export function AIChat() {
         }}>
           <div className="flex items-center gap-2" style={{ fontSize: 10, color: '#deb998' }}>
             <AlertTriangle size={10} />
-            <span>Agent offline — using browser fallback</span>
+            <span>{t('ai.agentOffline')}</span>
           </div>
           <div style={{ fontSize: 9, color: '#d9c1a5', marginTop: 4, background: '#1e1815', padding: '4px 6px', borderRadius: 4, border: '1px solid #5c4837' }}>
-            Open Settings and use Check connection after your local agent is running.
+            {t('ai.agentOfflineHelp')}
           </div>
         </div>
       )}
@@ -300,16 +303,16 @@ export function AIChat() {
         display: 'flex', gap: 12, background: '#14181e', flexShrink: 0,
       }}>
         <div className="flex items-center gap-1" style={{ fontSize: 9, color: '#8893a4' }}>
-          <Brain size={8} /> {memoryStats.notes} notes
+          <Brain size={8} /> {memoryStats.notes} {t('ai.notes')}
         </div>
         <div className="flex items-center gap-1" style={{ fontSize: 9, color: '#8893a4' }}>
-          <Network size={8} /> {memoryStats.connections} links
+          <Network size={8} /> {memoryStats.connections} {t('ai.links')}
         </div>
         <div className="flex items-center gap-1" style={{ fontSize: 9, color: '#8893a4' }}>
-          <Sparkles size={8} /> {memoryStats.tags} tags
+          <Sparkles size={8} /> {memoryStats.tags} {t('ai.tags')}
         </div>
         <div className="flex items-center gap-1" style={{ fontSize: 9, color: aiSettings.internetAccess ? '#9fc59d' : '#8893a4' }}>
-          <Globe size={8} /> {aiSettings.internetAccess ? 'Web on' : 'Web off'}
+          <Globe size={8} /> {aiSettings.internetAccess ? t('ai.webOn') : t('ai.webOff')}
         </div>
       </div>
 
@@ -318,73 +321,73 @@ export function AIChat() {
         <div style={{ padding: 12, borderBottom: '1px solid #303744', background: '#171b21', flexShrink: 0 }}>
           <div style={{ fontSize: 10, color: '#96a1b2', marginBottom: 8, padding: '4px 8px', background: '#1e232b', borderRadius: 4, border: '1px solid #303744' }}>
             {isOllamaMode
-              ? `Agent + Ollama (${aiSettings.model}) — full AI`
+              ? t('ai.statusAgentOllama', { model: aiSettings.model })
               : isCloudMode
-              ? `Agent + ${providerName} (${aiSettings.model}) — full AI`
+              ? t('ai.statusAgentCloud', { provider: providerName, model: aiSettings.model })
               : isAgentMode
               ? isApiProvider
-                ? `Agent running — add API key + model for ${providerName}`
-                : `Agent running — no Ollama. Install: ollama pull llama3.2`
-              : 'Agent offline — use Settings > Check connection'}
+                ? t('ai.statusAgentRunningApi', { provider: providerName })
+                : t('ai.statusAgentRunningNoOllama')
+              : t('ai.statusAgentOffline')}
           </div>
-          <ConfigField label="Provider">
+          <ConfigField label={t('ai.provider')}>
             <select value={aiSettings.provider}
               onChange={e => dispatch({ type: 'UPDATE_AI_SETTINGS', payload: { provider: e.target.value as 'ollama' } })}
               style={{ ...inputStyle, fontSize: 11 }}>
-              <option value="ollama">Ollama (local)</option>
+              <option value="ollama">{t('common.ollamaLocal')}</option>
             </select>
           </ConfigField>
           {aiSettings.provider === 'ollama' && (
-            <ConfigField label="Ollama URL">
+            <ConfigField label={t('ai.ollamaUrl')}>
               <input type="text" value={aiSettings.ollamaUrl}
                 onChange={e => dispatch({ type: 'UPDATE_AI_SETTINGS', payload: { ollamaUrl: e.target.value } })}
                 style={{ ...inputStyle, fontSize: 11 }} />
             </ConfigField>
           )}
           {isApiProvider && (
-            <ConfigField label="API key">
+            <ConfigField label={t('ai.apiKey')}>
               <input type="password" value={aiSettings.apiKey}
                 onChange={e => dispatch({ type: 'UPDATE_AI_SETTINGS', payload: { apiKey: e.target.value } })}
-                placeholder={aiSettings.provider === 'openai' ? 'sk-...' : aiSettings.provider === 'gemini' ? 'AIza...' : 'Provider API key'}
+                placeholder={aiSettings.provider === 'openai' ? 'sk-...' : aiSettings.provider === 'gemini' ? 'AIza...' : t('ai.providerApiKeyPlaceholder')}
                 style={{ ...inputStyle, fontSize: 11 }} />
             </ConfigField>
           )}
           {aiSettings.provider === 'openai-compatible' && (
-            <ConfigField label="API base">
+            <ConfigField label={t('ai.apiBase')}>
               <input type="text" value={aiSettings.apiBaseUrl}
                 onChange={e => dispatch({ type: 'UPDATE_AI_SETTINGS', payload: { apiBaseUrl: e.target.value } })}
                 placeholder="https://api.provider.com/v1"
                 style={{ ...inputStyle, fontSize: 11 }} />
             </ConfigField>
           )}
-          <ConfigField label="Model">
+          <ConfigField label={t('ai.model')}>
             <select value={aiSettings.model}
               onChange={e => dispatch({ type: 'UPDATE_AI_SETTINGS', payload: { model: e.target.value } })}
               style={{ ...inputStyle, fontSize: 11 }}>
               {models.length === 0
-                ? <option value="">No models found — run: ollama pull</option>
+                ? <option value="">{t('common.noModelsFound')}</option>
                 : models.map(m => <option key={m} value={m}>{m}</option>)}
             </select>
           </ConfigField>
-          <ConfigField label="Context">
+          <ConfigField label={t('ai.context')}>
             <input type="range" min={2} max={20} value={aiSettings.maxContextNotes}
               onChange={e => dispatch({ type: 'UPDATE_AI_SETTINGS', payload: { maxContextNotes: parseInt(e.target.value) } })}
               style={{ flex: 1, accentColor: '#666' }} />
             <span style={{ fontSize: 10, color: '#555', width: 20, textAlign: 'right' }}>{aiSettings.maxContextNotes}</span>
           </ConfigField>
-          <ConfigField label="Temperature">
+          <ConfigField label={t('ai.temperature')}>
             <input type="range" min={0} max={200} value={Math.round(aiSettings.temperature * 100)}
               onChange={e => dispatch({ type: 'UPDATE_AI_SETTINGS', payload: { temperature: parseInt(e.target.value) / 100 } })}
               style={{ flex: 1, accentColor: '#666' }} />
             <span style={{ fontSize: 10, color: '#555', width: 30, textAlign: 'right' }}>{aiSettings.temperature.toFixed(2)}</span>
           </ConfigField>
-          <ConfigField label="Max output">
+          <ConfigField label={t('ai.maxOutput')}>
             <input type="range" min={64} max={1024} step={32} value={aiSettings.maxOutputTokens}
               onChange={e => dispatch({ type: 'UPDATE_AI_SETTINGS', payload: { maxOutputTokens: parseInt(e.target.value) } })}
               style={{ flex: 1, accentColor: '#666' }} />
             <span style={{ fontSize: 10, color: '#555', width: 36, textAlign: 'right' }}>{aiSettings.maxOutputTokens}</span>
           </ConfigField>
-          <ConfigField label="Internet">
+          <ConfigField label={t('ai.internet')}>
             <div onClick={() => dispatch({ type: 'UPDATE_AI_SETTINGS', payload: { internetAccess: !aiSettings.internetAccess } })}
               style={{
                 width: 36, height: 20, borderRadius: 10, cursor: 'pointer',
@@ -398,7 +401,7 @@ export function AIChat() {
               }} />
             </div>
             <span style={{ fontSize: 10, color: aiSettings.internetAccess ? '#6a6' : '#555' }}>
-              {aiSettings.internetAccess ? 'Enabled' : 'Disabled'}
+              {aiSettings.internetAccess ? t('ai.enabled') : t('ai.disabled')}
             </span>
           </ConfigField>
         </div>
@@ -410,7 +413,7 @@ export function AIChat() {
           <div className="flex items-center justify-between" style={{ marginBottom: 6 }}>
             <span style={{ fontSize: 10, fontWeight: 600, color: '#666' }}>
               <Brain size={10} style={{ display: 'inline', marginRight: 4 }} />
-              AI Memory ({contextPreview.length.toLocaleString()} chars)
+              {t('ai.aiMemory', { chars: contextPreview.length.toLocaleString() })}
             </span>
             <button onClick={() => setContextPreview(null)} style={{ background: 'none', border: 'none', color: '#444', cursor: 'pointer' }}>
               <X size={10} />
@@ -433,22 +436,22 @@ export function AIChat() {
             }}>
               <FlintLogo size={24} />
             </div>
-            <div style={{ fontSize: 14, fontWeight: 600, color: '#777', marginBottom: 6 }}>Flint AI</div>
+            <div style={{ fontSize: 14, fontWeight: 600, color: '#777', marginBottom: 6 }}>{t('ai.title')}</div>
             <div style={{ fontSize: 11, color: '#444', lineHeight: 1.6, maxWidth: 260, margin: '0 auto 4px' }}>
               {isOllamaMode
-                ? `Powered by ${aiSettings.model} with memory of your ${notes.length} notes.`
+                ? t('ai.emptyOllama', { model: aiSettings.model, count: notes.length })
                 : isCloudMode
-                ? `Powered by ${providerName} with memory of your ${notes.length} notes.`
+                ? t('ai.emptyCloud', { provider: providerName, count: notes.length })
                 : isAgentMode
                 ? isApiProvider
-                  ? `Agent running. Add API key + model for ${providerName}.`
-                  : 'Agent running. Install an Ollama model for full AI.'
-                : 'I search your notes to answer. Start the Python agent for full AI + Ollama.'}
+                  ? t('ai.emptyAgentApi', { provider: providerName })
+                  : t('ai.emptyAgentNoModel')
+                : t('ai.emptyBrowser')}
             </div>
             <div className="flex items-center justify-center gap-3" style={{ fontSize: 9, color: '#333', marginBottom: 16 }}>
-              <span>{memoryStats.notes} notes</span>
-              <span>{memoryStats.connections} links</span>
-              {aiSettings.internetAccess && <span>Web</span>}
+              <span>{memoryStats.notes} {t('ai.notes')}</span>
+              <span>{memoryStats.connections} {t('ai.links')}</span>
+              {aiSettings.internetAccess && <span>{t('common.web')}</span>}
             </div>
             {activeNote && (
               <div style={{
@@ -456,16 +459,16 @@ export function AIChat() {
                 background: '#0a0a0a', borderRadius: 6,
                 border: '1px solid #1a1a1a', marginBottom: 12,
               }}>
-                Active: {activeNote.title}
+                {t('ai.activeNote', { title: activeNote.title })}
               </div>
             )}
             <div style={{ display: 'flex', flexDirection: 'column', gap: 4 }}>
               {[
-                'List all my notes',
-                'What connections exist in my vault?',
-                'What are the main topics I write about?',
-                'Summarize my notes',
-                'Help',
+                t('ai.promptListNotes'),
+                t('ai.promptConnections'),
+                t('ai.promptTopics'),
+                t('ai.promptSummarize'),
+                t('ai.promptHelp'),
               ].map(q => (
                 <button key={q} onClick={() => { setInput(q); inputRef.current?.focus(); }}
                   style={{
@@ -495,14 +498,14 @@ export function AIChat() {
                 </div>
               )}
               <span style={{ fontSize: 10, color: '#444', fontWeight: 500 }}>
-                {msg.role === 'user' ? 'You' : 'Flint AI'}
+                {msg.role === 'user' ? t('ai.you') : t('ai.title')}
               </span>
               <span style={{ fontSize: 9, color: '#222' }}>
                 {new Date(msg.timestamp).toLocaleTimeString([], { hour: '2-digit', minute: '2-digit' })}
               </span>
               {msg.webResults && (
                 <span className="flex items-center gap-1" style={{ fontSize: 9, color: '#465' }}>
-                  <Globe size={8} /> web
+                  <Globe size={8} /> {t('ai.webBadge')}
                 </span>
               )}
             </div>
@@ -523,7 +526,7 @@ export function AIChat() {
               <div style={{ width: 18, height: 18, borderRadius: 4, background: '#111', display: 'flex', alignItems: 'center', justifyContent: 'center' }}>
                 <FlintLogo size={10} />
               </div>
-              <span style={{ fontSize: 10, color: '#444', fontWeight: 500 }}>Flint AI</span>
+              <span style={{ fontSize: 10, color: '#444', fontWeight: 500 }}>{t('ai.title')}</span>
               <Loader2 size={9} className="animate-spin" style={{ color: '#444' }} />
             </div>
             <div style={{
@@ -542,7 +545,7 @@ export function AIChat() {
               <div style={{ width: 18, height: 18, borderRadius: 4, background: '#111', display: 'flex', alignItems: 'center', justifyContent: 'center' }}>
                 <FlintLogo size={10} />
               </div>
-              <span style={{ fontSize: 10, color: '#444', fontWeight: 500 }}>Flint AI</span>
+              <span style={{ fontSize: 10, color: '#444', fontWeight: 500 }}>{t('ai.title')}</span>
             </div>
             <div style={{ padding: '10px 14px', borderRadius: 8, background: '#0a0a0a', border: '1px solid #141414' }}>
               <div className="flex items-center gap-3">
@@ -550,12 +553,12 @@ export function AIChat() {
                 <span style={{ fontSize: 11, color: '#444' }}>
                   <Zap size={9} style={{ display: 'inline', marginRight: 4 }} />
                   {isOllamaMode
-                    ? `Thinking with ${aiSettings.model}...`
+                    ? t('ai.thinkingModel', { model: aiSettings.model })
                     : isCloudMode
-                    ? `Thinking with ${providerName}...`
+                    ? t('ai.thinkingProvider', { provider: providerName })
                     : isAgentMode
-                    ? 'Processing via agent...'
-                    : `Searching ${memoryStats.notes} notes...`}
+                    ? t('ai.processingAgent')
+                    : t('ai.searchingNotes', { count: memoryStats.notes })}
                 </span>
               </div>
             </div>
@@ -575,7 +578,7 @@ export function AIChat() {
           )}
           {aiSettings.internetAccess && (
             <span className="flex items-center gap-1" style={{ color: '#345' }}>
-              <Globe size={8} /> Internet on
+              <Globe size={8} /> {t('ai.internetOn')}
             </span>
           )}
         </div>
@@ -591,12 +594,12 @@ export function AIChat() {
             onKeyDown={handleKeyDown}
             placeholder={
               isOllamaMode
-                ? 'Ask anything (AI + notes + web)...'
+                ? t('ai.placeholderOllama')
                 : isCloudMode
-                ? `Ask anything (${providerName} + notes + web)...`
+                ? t('ai.placeholderCloud', { provider: providerName })
                 : isAgentMode
-                ? 'Ask about your notes...'
-                : 'Ask (browser search)...'
+                ? t('ai.placeholderAgent')
+                : t('ai.placeholderBrowser')
             }
             rows={2}
             style={{
@@ -607,12 +610,12 @@ export function AIChat() {
           />
           <div style={{ display: 'flex', flexDirection: 'column', gap: 3 }}>
             {isStreaming ? (
-              <button onClick={stopGeneration} title="Stop"
+              <button onClick={stopGeneration} title={t('ai.stop')}
                 style={{ ...sendBtnStyle, background: '#1a0808', color: '#844' }}>
                 <Loader2 size={14} />
               </button>
             ) : (
-              <button onClick={sendMessage} title="Send (Enter)"
+              <button onClick={sendMessage} title={t('ai.send')}
                 disabled={!input.trim()}
                 style={{
                   ...sendBtnStyle,
@@ -621,7 +624,7 @@ export function AIChat() {
                 <Send size={14} />
               </button>
             )}
-            <button onClick={() => dispatch({ type: 'CLEAR_AI_MESSAGES' })} title="Clear chat"
+            <button onClick={() => dispatch({ type: 'CLEAR_AI_MESSAGES' })} title={t('ai.clearChat')}
               style={{ ...sendBtnStyle, color: '#444' }}>
               <Trash2 size={12} />
             </button>

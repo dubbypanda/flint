@@ -1,8 +1,10 @@
 import { useState, useRef, useEffect } from 'react';
 import { useStore } from '../store';
 import { FileText, Folder, FolderOpen, ChevronRight, ChevronDown, Plus, FolderPlus, Search, Pin, Trash2, CalendarDays, Pencil } from 'lucide-react';
+import { useTranslation } from 'react-i18next';
 
 export function Sidebar() {
+  const { t } = useTranslation();
   const { state, dispatch, createNote, createFolder, openDailyNote } = useStore();
   const [search, setSearch] = useState('');
   const [ctx, setCtx] = useState<{ type: 'note' | 'folder'; id: string; x: number; y: number } | null>(null);
@@ -30,16 +32,16 @@ export function Sidebar() {
 
       {/* Search */}
       <div style={{ padding: '8px 10px', borderBottom: '1px solid var(--border)', background: 'var(--bg-surface)' }}>
-        <label htmlFor="sidebar-search" className="sr-only">Search notes in sidebar</label>
+        <label htmlFor="sidebar-search" className="sr-only">{t('sidebar.searchNotesLabel')}</label>
         <div className="flex items-center gap-2" style={{ padding: '6px 8px', background: 'var(--bg-deep)', border: '1px solid var(--border)', borderRadius: 7, boxShadow: 'inset 0 1px 0 rgba(255,255,255,0.02)' }}>
           <Search size={12} style={{ color: 'var(--text-dim)', flexShrink: 0 }} aria-hidden="true" />
           <input 
             id="sidebar-search"
             type="text" 
-            placeholder="Search notes..." 
-            value={search} 
+            placeholder={t('sidebar.searchPlaceholder')}
+            value={search}
             onChange={e => setSearch(e.target.value)}
-            aria-label="Filter notes by title"
+            aria-label={t('sidebar.filterAriaLabel')}
             style={{ flex: 1, background: 'none', border: 'none', color: 'var(--text)', fontSize: 12, outline: 'none' }} />
         </div>
       </div>
@@ -47,38 +49,38 @@ export function Sidebar() {
       {/* Actions */}
       <div className="flex items-center gap-1" style={{ padding: '8px 10px', borderBottom: '1px solid var(--border)', background: 'var(--bg-surface)' }}>
         <button 
-          onClick={() => createNote()} 
-          title="New note"
-          aria-label="Create a new note"
+          onClick={() => createNote()}
+          title={t('sidebar.newNote')}
+          aria-label={t('sidebar.newNoteAria')}
           style={{ padding: '4px 9px', background: 'var(--bg-elevated)', border: '1px solid var(--border-light)', color: 'var(--text-secondary)', fontSize: 11, borderRadius: 6, cursor: 'pointer', display: 'flex', alignItems: 'center', gap: 4 }}
           onMouseEnter={e => { e.currentTarget.style.borderColor = 'var(--border-focus)'; e.currentTarget.style.color = 'var(--text)'; }}
           onMouseLeave={e => { e.currentTarget.style.borderColor = 'var(--border-light)'; e.currentTarget.style.color = 'var(--text-secondary)'; }}>
-          <Plus size={11} /> Note
+          <Plus size={11} /> {t('sidebar.noteBtn')}
         </button>
         <button 
-          onClick={() => setShowNewFolder(true)} 
-          title="New folder"
-          aria-label="Create a new folder"
+          onClick={() => setShowNewFolder(true)}
+          title={t('sidebar.newFolder')}
+          aria-label={t('sidebar.newFolderAria')}
           style={{ padding: '4px 9px', background: 'var(--bg-elevated)', border: '1px solid var(--border-light)', color: 'var(--text-secondary)', fontSize: 11, borderRadius: 6, cursor: 'pointer', display: 'flex', alignItems: 'center', gap: 4 }}
           onMouseEnter={e => { e.currentTarget.style.borderColor = 'var(--border-focus)'; e.currentTarget.style.color = 'var(--text)'; }}
           onMouseLeave={e => { e.currentTarget.style.borderColor = 'var(--border-light)'; e.currentTarget.style.color = 'var(--text-secondary)'; }}>
-          <FolderPlus size={11} /> Folder
+          <FolderPlus size={11} /> {t('sidebar.folderBtn')}
         </button>
         <button 
-          onClick={() => openDailyNote()} 
-          title="Daily note"
-          aria-label="Open or create today's daily note"
+          onClick={() => openDailyNote()}
+          title={t('sidebar.dailyNote')}
+          aria-label={t('sidebar.dailyNoteAria')}
           style={{ padding: '4px 9px', background: 'var(--bg-elevated)', border: '1px solid var(--border-light)', color: 'var(--text-secondary)', fontSize: 11, borderRadius: 6, cursor: 'pointer', display: 'flex', alignItems: 'center', gap: 4 }}
           onMouseEnter={e => { e.currentTarget.style.borderColor = 'var(--border-focus)'; e.currentTarget.style.color = 'var(--text)'; }}
           onMouseLeave={e => { e.currentTarget.style.borderColor = 'var(--border-light)'; e.currentTarget.style.color = 'var(--text-secondary)'; }}>
-          <CalendarDays size={11} /> Daily
+          <CalendarDays size={11} /> {t('sidebar.dailyBtn')}
         </button>
       </div>
 
       {/* New folder input */}
       {showNewFolder && (
         <div style={{ padding: '6px 10px', borderBottom: '1px solid #1a1a1a' }}>
-          <input type="text" placeholder="Folder name..." value={newFolderName}
+          <input type="text" placeholder={t('sidebar.folderNamePlaceholder')} value={newFolderName}
             onChange={e => setNewFolderName(e.target.value)}
             onKeyDown={e => { if (e.key === 'Enter' && newFolderName.trim()) { createFolder(newFolderName.trim()); setNewFolderName(''); setShowNewFolder(false); } if (e.key === 'Escape') setShowNewFolder(false); }}
             autoFocus
@@ -92,7 +94,7 @@ export function Sidebar() {
         {pinnedNotes.length > 0 && (
           <>
             <div style={{ padding: '4px 12px', fontSize: 10, fontWeight: 600, color: '#333', textTransform: 'uppercase', letterSpacing: '0.06em' }}>
-              Pinned
+              {t('sidebar.pinned')}
             </div>
             {pinnedNotes.map(note => (
               <NoteItem key={note.id} note={note} active={note.id === state.activeNoteId}
@@ -159,7 +161,7 @@ export function Sidebar() {
         {allTags.length > 0 && (
           <>
             <div style={{ padding: '8px 12px 4px', fontSize: 10, fontWeight: 600, color: '#333', textTransform: 'uppercase', letterSpacing: '0.06em', borderTop: '1px solid #1a1a1a', marginTop: 4, paddingTop: 8 }}>
-              Tags
+              {t('sidebar.tags')}
             </div>
             <div style={{ padding: '0 12px 8px', display: 'flex', flexWrap: 'wrap', gap: 4 }}>
               {allTags.slice(0, 12).map(tag => (
@@ -175,21 +177,21 @@ export function Sidebar() {
       {/* Context menu */}
       {ctx && (
         <div 
-          aria-label={ctx.type === 'note' ? 'Note options' : 'Folder options'}
+          aria-label={ctx.type === 'note' ? t('sidebar.noteOptions') : t('sidebar.folderOptions')}
           style={{ position: 'fixed', left: ctx.x, top: ctx.y, zIndex: 300, background: '#111', border: '1px solid #222', borderRadius: 6, padding: '4px 0', minWidth: 140, boxShadow: '0 4px 16px rgba(0,0,0,0.5)' }}
           className="animate-scale-in">
           {ctx.type === 'note' && (
             <>
-              <CtxItem icon={<Pencil size={12} />} label="Rename note" onClick={() => { setRenamingNoteId(ctx.id); setCtx(null); }} />
-              <CtxItem icon={<Pin size={12} />} label="Toggle pin" onClick={() => { dispatch({ type: 'PIN_NOTE', payload: ctx.id }); setCtx(null); }} />
-              <CtxItem icon={<Trash2 size={12} />} label="Delete note" onClick={() => { dispatch({ type: 'DELETE_NOTE', payload: ctx.id }); setCtx(null); }} />
+              <CtxItem icon={<Pencil size={12} />} label={t('sidebar.renameNote')} onClick={() => { setRenamingNoteId(ctx.id); setCtx(null); }} />
+              <CtxItem icon={<Pin size={12} />} label={t('sidebar.togglePin')} onClick={() => { dispatch({ type: 'PIN_NOTE', payload: ctx.id }); setCtx(null); }} />
+              <CtxItem icon={<Trash2 size={12} />} label={t('sidebar.deleteNote')} onClick={() => { dispatch({ type: 'DELETE_NOTE', payload: ctx.id }); setCtx(null); }} />
             </>
           )}
           {ctx.type === 'folder' && (
             <>
-              <CtxItem icon={<Pencil size={12} />} label="Rename folder" onClick={() => { setRenamingFolderId(ctx.id); setCtx(null); }} />
-              <CtxItem icon={<Plus size={12} />} label="New note here" onClick={() => { createNote(ctx.id); setCtx(null); }} />
-              <CtxItem icon={<Trash2 size={12} />} label="Delete folder" onClick={() => { dispatch({ type: 'DELETE_FOLDER', payload: ctx.id }); setCtx(null); }} />
+              <CtxItem icon={<Pencil size={12} />} label={t('sidebar.renameFolder')} onClick={() => { setRenamingFolderId(ctx.id); setCtx(null); }} />
+              <CtxItem icon={<Plus size={12} />} label={t('sidebar.newNoteHere')} onClick={() => { createNote(ctx.id); setCtx(null); }} />
+              <CtxItem icon={<Trash2 size={12} />} label={t('sidebar.deleteFolder')} onClick={() => { dispatch({ type: 'DELETE_FOLDER', payload: ctx.id }); setCtx(null); }} />
             </>
           )}
         </div>

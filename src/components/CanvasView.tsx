@@ -2,6 +2,7 @@ import { useEffect, useMemo, useRef, useState, useCallback } from 'react';
 import { useStore } from '../store';
 import { FlintLogo } from './FlintLogo';
 import { Grip, RotateCcw, Search, X, Plus, Type, Trash2, FileText } from 'lucide-react';
+import { useTranslation } from 'react-i18next';
 import type { CanvasCard } from '../types';
 
 // Persistence
@@ -194,6 +195,7 @@ interface ImageCardBodyProps {
 }
 
 function ImageCardBody({ card, zoom, updateCard, pushHistorySnapshot }: ImageCardBodyProps) {
+  const { t } = useTranslation();
   const [isDragHover, setIsDragHover] = useState(false);
   const fileInputRef = useRef<HTMLInputElement>(null);
 
@@ -227,7 +229,7 @@ function ImageCardBody({ card, zoom, updateCard, pushHistorySnapshot }: ImageCar
       >
         <img
           src={card.content}
-          alt="Canvas PNG Attachment"
+          alt={t('canvas.pngAlt')}
           style={{
             maxWidth: '100%',
             maxHeight: '100%',
@@ -252,7 +254,7 @@ function ImageCardBody({ card, zoom, updateCard, pushHistorySnapshot }: ImageCar
           onClick={() => fileInputRef.current?.click()}
         >
           <span style={{ color: '#fff', fontSize: 11 / zoom, fontWeight: 500, background: 'rgba(0,0,0,0.6)', padding: '4px 10px', borderRadius: 4 }}>
-            Change Image
+            {t('canvas.changeImage')}
           </span>
         </div>
         <input
@@ -308,10 +310,10 @@ function ImageCardBody({ card, zoom, updateCard, pushHistorySnapshot }: ImageCar
         <polyline points="21 15 16 10 5 21" />
       </svg>
       <span style={{ fontSize: 11 / zoom, color: isDragHover ? '#7f6df2' : '#b3b3b3', fontWeight: 500, display: 'block', marginBottom: 2 }}>
-        Drag & drop PNG/image
+        {t('canvas.dragDropImage')}
       </span>
       <span style={{ fontSize: 9.5 / zoom, color: '#666668' }}>
-        or click to browse
+        {t('canvas.orClickToBrowse')}
       </span>
       <input
         type="file"
@@ -327,6 +329,7 @@ function ImageCardBody({ card, zoom, updateCard, pushHistorySnapshot }: ImageCar
 // Main component
 
 export function CanvasView() {
+  const { t } = useTranslation();
   const { state, dispatch } = useStore();
   const [query, setQuery] = useState('');
   const [zoom, setZoom] = useState(1);
@@ -767,7 +770,7 @@ export function CanvasView() {
   };
 
   const resetLayout = () => {
-    if (confirm('Reset canvas layout? All card positions, connections, and text cards will be cleared.')) {
+    if (confirm(t('canvas.resetConfirm'))) {
       pushHistorySnapshot();
       updateCards([]);
       setConnections([]);
@@ -927,10 +930,10 @@ export function CanvasView() {
           const titleLine = isNote && note
             ? note.content.split('\n').find(l => l.startsWith('# '))?.replace(/^# /, '') || note.title
             : isImage
-            ? 'PNG Attachment'
+            ? t('canvas.pngAttachment')
             : isFrame
-            ? 'Frame Group'
-            : 'Text Card';
+            ? t('canvas.frameGroup')
+            : t('canvas.textCard');
             
           const colorIdx = cardColors[card.id] ?? 0;
           const cardColor = CARD_COLORS[colorIdx];
@@ -1128,10 +1131,10 @@ export function CanvasView() {
                   {isFrame ? (
                     // Flat inline editable input for naming Frame Groups
                     <input
-                      value={card.content || 'Group Frame'}
+                      value={card.content || t('canvas.groupFrame')}
                       onChange={e => updateCard(card.id, { content: e.target.value })}
                       onMouseDown={e => e.stopPropagation()}
-                      placeholder="Name Frame Group..."
+                      placeholder={t('canvas.nameFrameGroup')}
                       style={{
                         background: 'none', border: 'none', outline: 'none',
                         color: isSelected ? '#ffffff' : textSecondary, fontSize: 11.5, fontWeight: 600,
@@ -1172,7 +1175,7 @@ export function CanvasView() {
                       {previewLines ? (
                         previewLines.slice(0, 300) + (previewLines.length > 300 ? '...' : '')
                       ) : (
-                        <span style={{ color: textMuted, fontStyle: 'italic' }}>Empty note file</span>
+                        <span style={{ color: textMuted, fontStyle: 'italic' }}>{t('canvas.emptyNoteFile')}</span>
                       )}
                     </div>
                   ) : isImage ? (
@@ -1187,7 +1190,7 @@ export function CanvasView() {
                       value={card.content || ''}
                       onChange={e => updateCard(card.id, { content: e.target.value })}
                       onMouseDown={e => e.stopPropagation()}
-                      placeholder="Write anything..."
+                      placeholder={t('canvas.writeAnything')}
                       style={{
                         flex: 1, width: '100%', background: 'none', border: 'none', outline: 'none',
                         color: textPrimary, fontSize: 12, resize: 'none',
@@ -1323,14 +1326,14 @@ export function CanvasView() {
             onMouseLeave={e => e.currentTarget.style.background = 'none'}
           >
             <Trash2 size={12} />
-            <span>Delete connection</span>
+            <span>{t('canvas.deleteConnection')}</span>
           </button>
 
           <div style={{ height: 1, background: '#2e2e31', margin: '4px 0' }} />
 
           {/* Option 2: Change Line Color Grid */}
           <div style={{ padding: '6px 12px' }}>
-            <span style={{ fontSize: 10.5, color: textSecondary, fontWeight: 500, display: 'block', marginBottom: 6 }}>Change color</span>
+            <span style={{ fontSize: 10.5, color: textSecondary, fontWeight: 500, display: 'block', marginBottom: 6 }}>{t('canvas.changeColor')}</span>
             <div style={{ display: 'grid', gridTemplateColumns: 'repeat(5, 1fr)', gap: 5 }}>
               {CONN_COLORS.map(color => (
                 <button
@@ -1340,7 +1343,7 @@ export function CanvasView() {
                     setConnections(prev => prev.map(c => c.id === lineContextMenu.connId ? { ...c, color } : c));
                     setLineContextMenu(null);
                   }}
-                  title={`Change color to ${color}`}
+                  title={t('canvas.changeColorTo', { color })}
                   style={{
                     width: 18,
                     height: 18,
@@ -1403,14 +1406,14 @@ export function CanvasView() {
             onMouseLeave={e => e.currentTarget.style.background = 'none'}
           >
             <Trash2 size={12} />
-            <span>Delete card</span>
+            <span>{t('canvas.deleteCard')}</span>
           </button>
 
           <div style={{ height: 1, background: '#2e2e31', margin: '4px 0' }} />
 
           {/* Option 2: Change Card Outline Color Preset */}
           <div style={{ padding: '6px 12px' }}>
-            <span style={{ fontSize: 10.5, color: textSecondary, fontWeight: 500, display: 'block', marginBottom: 6 }}>Change card color</span>
+            <span style={{ fontSize: 10.5, color: textSecondary, fontWeight: 500, display: 'block', marginBottom: 6 }}>{t('canvas.changeCardColor')}</span>
             <div style={{ display: 'grid', gridTemplateColumns: 'repeat(4, 1fr)', gap: 5 }}>
               {CARD_COLORS.map((col, idx) => (
                 <button
@@ -1452,12 +1455,12 @@ export function CanvasView() {
       >
         <div className="flex items-center gap-3">
           <FlintLogo size={14} />
-          <span style={{ fontSize: 13, fontWeight: 600, color: textPrimary, letterSpacing: '0.2px' }}>Flint Canvas</span>
+          <span style={{ fontSize: 13, fontWeight: 600, color: textPrimary, letterSpacing: '0.2px' }}>{t('canvas.title')}</span>
           <span style={{
             fontSize: 10.5, color: textSecondary, background: 'rgba(255,255,255,0.03)',
             padding: '2px 8px', borderRadius: 4, border: `1px solid #232326`,
           }}>
-            {filteredCards.length} nodes · {wikilinkEdges.length + connections.length} links
+            {t('canvas.nodesAndLinks', { nodes: filteredCards.length, edges: wikilinkEdges.length + connections.length })}
           </span>
         </div>
 
@@ -1471,7 +1474,7 @@ export function CanvasView() {
             <input
               value={query}
               onChange={e => setQuery(e.target.value)}
-              placeholder="Filter canvas..."
+              placeholder={t('canvas.filterCanvas')}
               style={{ background: 'none', border: 'none', outline: 'none', color: textPrimary, fontSize: 12, width: 140, fontFamily: 'inherit' }}
             />
             {query && (
@@ -1532,7 +1535,7 @@ export function CanvasView() {
               <Search size={12} style={{ color: textMuted }} />
               <input
                 autoFocus
-                placeholder="Search note from vault..."
+                placeholder={t('canvas.searchNoteFromVault')}
                 value={noteSearch}
                 onChange={e => setNoteSearch(e.target.value)}
                 style={{ background: 'none', border: 'none', outline: 'none', color: textPrimary, fontSize: 11.5, width: '100%' }}
@@ -1541,7 +1544,7 @@ export function CanvasView() {
             
             <div style={{ display: 'flex', flexDirection: 'column', gap: 1, overflowY: 'auto', maxHeight: 200 }} className="canvas-card-scroll">
               {filteredNotes.length === 0 ? (
-                <div style={{ color: textMuted, fontSize: 11, textAlign: 'center', padding: 12, fontStyle: 'italic' }}>No notes found</div>
+                <div style={{ color: textMuted, fontSize: 11, textAlign: 'center', padding: 12, fontStyle: 'italic' }}>{t('canvas.noNotesFound')}</div>
               ) : (
                 filteredNotes.map(note => (
                   <button
@@ -1591,7 +1594,7 @@ export function CanvasView() {
           {/* Add Text Card Button */}
           <button
             onClick={addTextCard}
-            title="Create Text Card"
+            title={t('canvas.createTextCard')}
             style={{
               background: 'none', border: 'none', color: textSecondary,
               cursor: 'pointer', padding: '6px 12px', borderRadius: 9999, fontSize: 11.5,
@@ -1602,7 +1605,7 @@ export function CanvasView() {
             onMouseLeave={e => { e.currentTarget.style.color = textSecondary; e.currentTarget.style.background = 'none'; }}
           >
             <Type size={12} />
-            <span>Add Card</span>
+            <span>{t('canvas.addCard')}</span>
           </button>
 
           <div style={{ height: 16, width: 1, background: 'rgba(255,255,255,0.08)' }} />
@@ -1610,7 +1613,7 @@ export function CanvasView() {
           {/* Add Note Card Button */}
           <button
             onClick={() => { setNotePickerOpen(!notePickerOpen); setNoteSearch(''); }}
-            title="Add existing note from your vault"
+            title={t('canvas.addExistingNote')}
             style={{
               background: 'none', border: 'none', color: textSecondary,
               cursor: 'pointer', padding: '6px 12px', borderRadius: 9999, fontSize: 11.5,
@@ -1621,7 +1624,7 @@ export function CanvasView() {
             onMouseLeave={e => { e.currentTarget.style.color = textSecondary; e.currentTarget.style.background = 'none'; }}
           >
             <FileText size={12} />
-            <span>Add Note</span>
+            <span>{t('canvas.addNote')}</span>
           </button>
 
           <div style={{ height: 16, width: 1, background: 'rgba(255,255,255,0.08)' }} />
@@ -1629,7 +1632,7 @@ export function CanvasView() {
           {/* Add PNG Image Card Button (Added near Note as requested!) */}
           <button
             onClick={addImageCard}
-            title="Add PNG / Image Card"
+            title={t('canvas.addImageCard')}
             style={{
               background: 'none', border: 'none', color: textSecondary,
               cursor: 'pointer', padding: '6px 12px', borderRadius: 9999, fontSize: 11.5,
@@ -1644,19 +1647,19 @@ export function CanvasView() {
               <circle cx="8.5" cy="8.5" r="1.5" />
               <polyline points="21 15 16 10 5 21" />
             </svg>
-            <span>Add PNG</span>
+            <span>{t('canvas.addPng')}</span>
           </button>
 
           <div style={{ height: 16, width: 1, background: 'rgba(255,255,255,0.08)' }} />
 
           {/* Active drawing line color picker */}
           <div style={{ display: 'flex', alignItems: 'center', gap: 4, padding: '0 8px' }}>
-            <span style={{ fontSize: 10, color: textMuted, marginRight: 2 }}>Line:</span>
+            <span style={{ fontSize: 10, color: textMuted, marginRight: 2 }}>{t('canvas.line')}</span>
             {CONN_COLORS.slice(0, 5).map(color => (
               <button
                 key={color}
                 onClick={() => setSelectedConnColor(color)}
-                title={`Line color: ${color}`}
+                title={t('canvas.lineColorTo', { color })}
                 style={{
                   width: 12, height: 12, borderRadius: '50%',
                   background: color, border: selectedConnColor === color ? '1.5px solid #fff' : '1px solid rgba(255,255,255,0.1)',
@@ -1683,7 +1686,7 @@ export function CanvasView() {
                 cursor: 'pointer', accentColor: '#7f6df2', width: 12, height: 12,
               }}
             />
-            <span>Arrows</span>
+            <span>{t('canvas.arrows')}</span>
           </label>
 
           <div style={{ height: 16, width: 1, background: 'rgba(255,255,255,0.08)' }} />
@@ -1691,7 +1694,7 @@ export function CanvasView() {
           {/* Clear Canvas Action */}
           <button
             onClick={resetLayout}
-            title="Reset/Clear Canvas"
+            title={t('canvas.resetCanvas')}
             style={{
               background: 'none', border: 'none', color: '#ff5f5f',
               cursor: 'pointer', padding: '6px 10px', borderRadius: 9999,
@@ -1728,7 +1731,7 @@ export function CanvasView() {
         {/* Zoom Out */}
         <button
           onClick={zoomOut}
-          title="Zoom out"
+          title={t('canvas.zoomOut')}
           style={{
             background: 'none', border: 'none', color: textSecondary,
             cursor: 'pointer', width: 24, height: 24, borderRadius: 4,
@@ -1752,7 +1755,7 @@ export function CanvasView() {
         {/* Zoom In */}
         <button
           onClick={zoomIn}
-          title="Zoom in"
+          title={t('canvas.zoomIn')}
           style={{
             background: 'none', border: 'none', color: textSecondary,
             cursor: 'pointer', width: 24, height: 24, borderRadius: 4,
@@ -1770,7 +1773,7 @@ export function CanvasView() {
         {/* Centering view / reset zoom */}
         <button
           onClick={resetZoom}
-          title="Reset zoom & fit"
+          title={t('canvas.resetZoom')}
           style={{
             background: 'none', border: 'none', color: textSecondary,
             cursor: 'pointer', width: 24, height: 24, borderRadius: 4,
@@ -1790,11 +1793,11 @@ export function CanvasView() {
         fontSize: 9.5, color: textMuted, display: 'flex', gap: 8, pointerEvents: 'none', whiteSpace: 'nowrap', zIndex: 10,
         background: 'rgba(15,15,17,0.35)', padding: '2px 8px', borderRadius: 4, backdropFilter: 'blur(4px)',
       }}>
-        <span>Left-click drag empty board to pan</span> <span>-</span>
-        <span>Drag header to move card</span> <span>-</span>
-        <span>Right-click card or line for settings</span> <span>-</span>
-        <span>Ctrl+Z to Undo</span> <span>-</span>
-        <span>ESC to cancel</span>
+        <span>{t('canvas.hintPan')}</span> <span>-</span>
+        <span>{t('canvas.hintMoveCard')}</span> <span>-</span>
+        <span>{t('canvas.hintRightClick')}</span> <span>-</span>
+        <span>{t('canvas.hintUndo')}</span> <span>-</span>
+        <span>{t('canvas.hintCancel')}</span>
       </div>
 
       {/* Global scrollbar CSS */}

@@ -10,10 +10,12 @@ import {
   getHandle,
 } from '../services/filesystem';
 import type { Note, Folder as FolderType } from '../types';
+import { useTranslation } from 'react-i18next';
 
 // showDirectoryPicker is declared in src/types/fs.d.ts
 
 export function VaultScreen() {
+  const { t } = useTranslation();
   const { state, dispatch, importNotes } = useStore();
   const [name, setName] = useState('');
   const [showNew, setShowNew] = useState(false);
@@ -36,7 +38,7 @@ export function VaultScreen() {
     setLoading(true);
     try {
       if (!isFileSystemSupported()) {
-        setError('Your browser does not support opening folders. Please use Chrome, Edge, or Opera.');
+        setError(t('vault.browserNotSupported'));
         setLoading(false);
         return;
       }
@@ -48,7 +50,7 @@ export function VaultScreen() {
       // Check permission
       const permitted = await requestPermission(dirHandle);
       if (!permitted) {
-        setError('Permission denied. Please allow access to the folder.');
+        setError(t('vault.permissionDenied'));
         setLoading(false);
         return;
       }
@@ -117,7 +119,7 @@ export function VaultScreen() {
       if (err instanceof Error && err.name === 'AbortError') {
         // User cancelled
       } else {
-        setError(err instanceof Error ? err.message : 'Failed to open folder');
+        setError(err instanceof Error ? err.message : t('vault.failedToOpenFolder'));
       }
     }
     setLoading(false);
@@ -129,13 +131,13 @@ export function VaultScreen() {
     try {
       const handle = await getHandle(vaultId);
       if (!handle) {
-        setError('Folder access lost. Please open the folder again.');
+        setError(t('vault.folderAccessLost'));
         setLoading(false);
         return;
       }
       const permitted = await requestPermission(handle);
       if (!permitted) {
-        setError('Permission denied. Please allow access to the folder.');
+        setError(t('vault.permissionDenied'));
         setLoading(false);
         return;
       }
@@ -175,7 +177,7 @@ export function VaultScreen() {
       dispatch({ type: 'SET_FOLDER_HANDLE', payload: true });
       importNotes(notes, folders);
     } catch (err: unknown) {
-      setError(err instanceof Error ? err.message : 'Failed to reopen folder');
+      setError(err instanceof Error ? err.message : t('vault.failedToReopenFolder'));
     }
     setLoading(false);
   };
@@ -188,10 +190,10 @@ export function VaultScreen() {
           <div style={{ width: 80, height: 96, margin: '0 auto 16px', display: 'flex', alignItems: 'center', justifyContent: 'center' }}>
             <FlintLogoLarge size={60} />
           </div>
-          <h1 style={{ fontSize: 32, fontWeight: 700, color: '#e0e0e0', letterSpacing: '-0.03em' }}>Flint</h1>
-          <p style={{ fontSize: 13, color: '#555', marginTop: 4 }}>Local knowledge base</p>
+          <h1 style={{ fontSize: 32, fontWeight: 700, color: '#e0e0e0', letterSpacing: '-0.03em' }}>{t('vault.appName')}</h1>
+          <p style={{ fontSize: 13, color: '#555', marginTop: 4 }}>{t('vault.tagline')}</p>
           <div style={{ display: 'flex', alignItems: 'center', justifyContent: 'center', gap: 4, fontSize: 10, color: '#444', marginTop: 8 }}>
-            <Lock size={9} /> Offline & Secure
+            <Lock size={9} /> {t('vault.offlineSecure')}
           </div>
         </div>
 
@@ -205,7 +207,7 @@ export function VaultScreen() {
         {state.vaults.length > 0 && (
           <div style={{ marginBottom: 24 }}>
             <div style={{ fontSize: 10, fontWeight: 600, color: '#444', textTransform: 'uppercase', letterSpacing: '0.08em', marginBottom: 8, padding: '0 4px' }}>
-              Your Vaults
+              {t('vault.yourVaults')}
             </div>
             {state.vaults.map(vault => {
               const workspace = state.vaultData[vault.id];
@@ -233,7 +235,7 @@ export function VaultScreen() {
                     {vault.isFolderVault ? (
                       <span className="flex items-center gap-1"><Folder size={9} /> {vault.folderPath}</span>
                     ) : (
-                      <span>{noteCount} notes · {folderCount} folders</span>
+                      <span>{t('vault.notesAndFolders', { notes: noteCount, folders: folderCount })}</span>
                     )}
                   </div>
                 </div>
@@ -241,7 +243,7 @@ export function VaultScreen() {
                   style={{ padding: 4, background: 'none', border: 'none', color: '#333', cursor: 'pointer', borderRadius: 4, display: 'flex' }}
                   onMouseEnter={e => { e.currentTarget.style.color = '#888'; }}
                   onMouseLeave={e => { e.currentTarget.style.color = '#333'; }}
-                  onClick={e => { e.stopPropagation(); if (confirm('Delete vault "' + vault.name + '"?')) dispatch({ type: 'DELETE_VAULT', payload: vault.id }); }}>
+                  onClick={e => { e.stopPropagation(); if (confirm(t('vault.deleteVaultConfirm', { name: vault.name }))) dispatch({ type: 'DELETE_VAULT', payload: vault.id }); }}>
                   <Trash2 size={13} />
                 </button>
               </div>
@@ -268,20 +270,20 @@ export function VaultScreen() {
           onMouseEnter={e => { if (!loading) { e.currentTarget.style.background = '#161616'; e.currentTarget.style.borderColor = '#333'; e.currentTarget.style.color = '#ccc'; } }}
           onMouseLeave={e => { if (!loading) { e.currentTarget.style.background = '#0f0f0f'; e.currentTarget.style.borderColor = '#222'; e.currentTarget.style.color = '#999'; } }}>
           <FolderOpen size={18} />
-          {loading ? 'Opening...' : 'Open Folder as Vault'}
+          {loading ? t('vault.opening') : t('vault.openFolderAsVault')}
         </button>
 
         {!isFileSystemSupported() && (
           <p style={{ fontSize: 11, color: '#555', textAlign: 'center', marginBottom: 10 }}>
-            Folder access requires Chrome, Edge, or Opera browser
+            {t('vault.browserHint')}
           </p>
         )}
 
         {/* Create empty vault */}
         {showNew ? (
           <div style={{ background: '#0a0a0a', border: '1px solid #1a1a1a', borderRadius: 10, padding: 16 }} className="animate-scale-in">
-            <div style={{ fontSize: 13, fontWeight: 600, color: '#bbb', marginBottom: 12 }}>Create new vault</div>
-            <input type="text" placeholder="Vault name" value={name}
+            <div style={{ fontSize: 13, fontWeight: 600, color: '#bbb', marginBottom: 12 }}>{t('vault.createNewVault')}</div>
+            <input type="text" placeholder={t('vault.vaultNamePlaceholder')} value={name}
               onChange={e => setName(e.target.value)}
               onKeyDown={e => { if (e.key === 'Enter') create(); if (e.key === 'Escape') setShowNew(false); }}
               autoFocus
@@ -290,11 +292,11 @@ export function VaultScreen() {
             <div className="flex items-center gap-2">
               <button onClick={create}
                 style={{ flex: 1, padding: '8px 0', background: '#888', color: '#000', border: 'none', borderRadius: 6, fontSize: 13, fontWeight: 600, cursor: 'pointer' }}>
-                Create Vault
+                {t('vault.createVault')}
               </button>
               <button onClick={() => { setShowNew(false); setName(''); }}
                 style={{ padding: '8px 16px', background: '#1a1a1a', color: '#888', border: '1px solid #222', borderRadius: 6, fontSize: 13, cursor: 'pointer' }}>
-                Cancel
+                {t('common.cancel')}
               </button>
             </div>
           </div>
@@ -304,18 +306,18 @@ export function VaultScreen() {
             style={{ width: '100%', padding: '10px 0', background: '#0a0a0a', border: '1px dashed #222', borderRadius: 8, color: '#555', fontSize: 12, fontWeight: 500, cursor: 'pointer', transition: 'all 0.15s' }}
             onMouseEnter={e => { e.currentTarget.style.background = '#111'; e.currentTarget.style.borderColor = '#333'; e.currentTarget.style.color = '#888'; }}
             onMouseLeave={e => { e.currentTarget.style.background = '#0a0a0a'; e.currentTarget.style.borderColor = '#222'; e.currentTarget.style.color = '#555'; }}>
-            <Plus size={14} /> Create empty vault
+            <Plus size={14} /> {t('vault.createEmptyVault')}
           </button>
         )}
 
         {/* Footer */}
         <div className="text-center" style={{ marginTop: 32 }}>
           <div className="flex items-center justify-center gap-4" style={{ fontSize: 10, color: '#333' }}>
-            <span>Encrypted storage</span>
+            <span>{t('vault.encryptedStorage')}</span>
             <span>·</span>
-            <span>Zero cloud</span>
+            <span>{t('vault.zeroCloud')}</span>
             <span>·</span>
-            <span>Your data</span>
+            <span>{t('vault.yourData')}</span>
           </div>
         </div>
       </div>

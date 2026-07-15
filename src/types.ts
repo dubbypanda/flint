@@ -58,6 +58,7 @@ export interface FlintSettings {
   wordWrap: boolean;
   theme: 'dark' | 'light' | 'rose' | 'ocean' | 'forest' | 'amber';
   editorStyle: 'split' | 'tiptap';
+  language: 'en' | 'de' | 'fr' | 'ru';
 }
 
 export interface ChatMessage {
