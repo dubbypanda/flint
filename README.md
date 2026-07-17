@@ -64,13 +64,12 @@ Requirements:
 
 ### AI Agent
 
-- Optional local Python agent
-- Uses your notes as memory
-- Can read graph connections for more context
-- currently Works with Ollama only
-- Can search Wikipedia when internet access is enabled
->- under development 
-- Note-editing actions for supported requests
+- [ ] Optional local Python agent
+- [ ] Uses your notes as memory
+- [ ] Can read graph connections for more context
+- [ ] currently Works with Ollama only
+- [ ] Can search Wikipedia when internet access is enabled
+- [ ] Note-editing actions for supported requests
 
 ### Local First
 
