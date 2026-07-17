@@ -1,1 +1,0 @@
-- ### *If this project could not satisfy the promises that are shown in the `readme`, I am so sorry for that.*
